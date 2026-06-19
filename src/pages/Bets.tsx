@@ -9,10 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw } from "lucide-react";
-import { STATUS_COLORS, STATUS_LABELS, computeNetProfit, type BetStatus } from "@/lib/calc";
+import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3 } from "lucide-react";
+import { STATUS_COLORS, STATUS_LABELS, recomputeBetDerived, type BetStatus } from "@/lib/calc";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
+import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
+import { BetCard } from "@/components/bets/BetCard";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function Bets() {
   useEffect(() => { document.title = "Apostas · Bankroll Pro"; }, []);
@@ -27,6 +30,7 @@ export default function Bets() {
   const [sport, setSport] = useState<string>("all");
   const [bookmaker, setBookmaker] = useState<string>("all");
   const [toDelete, setToDelete] = useState<Bet | null>(null);
+  const [view, setView] = useState<"cards" | "table">("cards");
 
   const sports = useMemo(() => Array.from(new Set(bets.map((b) => b.sport).filter(Boolean) as string[])), [bets]);
   const books = useMemo(() => Array.from(new Set(bets.map((b) => b.bookmaker).filter(Boolean) as string[])), [bets]);
@@ -51,9 +55,19 @@ export default function Bets() {
   }, [filtered]);
 
   async function setStatusQuick(b: Bet, newStatus: BetStatus) {
-    const net = computeNetProfit(newStatus, Number(b.stake_amount), Number(b.odds));
-    const gross = newStatus === "void" || newStatus === "pendente" ? 0 : Number(b.stake_amount) + net;
-    await updateBet.mutateAsync({ id: b.id, patch: { status: newStatus, net_profit: net, gross_return: gross } });
+    const derived = recomputeBetDerived({
+      status: newStatus,
+      odds: Number(b.odds),
+      stake_amount: Number(b.stake_amount),
+      closing_odds: b.closing_odds,
+      estimated_probability: b.estimated_probability,
+      gross_return: b.gross_return,
+      kelly_fraction_setting: profile?.kelly_fraction ?? 0.25,
+    });
+    await updateBet.mutateAsync({
+      id: b.id,
+      patch: { status: newStatus, ...derived },
+    });
     toast.success(`Marcada como ${STATUS_LABELS[newStatus]}`);
   }
 
@@ -64,7 +78,13 @@ export default function Bets() {
           <h1 className="text-2xl font-semibold tracking-tight">Apostas</h1>
           <p className="text-sm text-muted-foreground">Todos os registros, com busca, filtros e edição rápida.</p>
         </div>
-        <Button asChild><Link to="/nova-aposta"><PlusCircle className="h-4 w-4 mr-2" />Nova aposta</Link></Button>
+        <div className="flex items-center gap-2">
+          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "cards" | "table")} variant="outline" size="sm">
+            <ToggleGroupItem value="cards" aria-label="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="table" aria-label="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
+          </ToggleGroup>
+          <Button asChild><Link to="/nova-aposta"><PlusCircle className="h-4 w-4 mr-2" />Nova aposta</Link></Button>
+        </div>
       </div>
 
       <div className="surface p-3 flex flex-wrap items-center gap-2">
@@ -100,6 +120,24 @@ export default function Bets() {
         </div>
       </div>
 
+      {view === "cards" ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {isLoading && <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Carregando...</div>}
+          {!isLoading && filtered.length === 0 && (
+            <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Nenhuma aposta encontrada.</div>
+          )}
+          {filtered.map((b) => (
+            <BetCard
+              key={b.id}
+              bet={b}
+              currency={currency}
+              unitValue={profile?.unit_value}
+              onStatus={setStatusQuick}
+              onDelete={setToDelete}
+            />
+          ))}
+        </div>
+      ) : (
       <div className="surface overflow-x-auto">
         <Table>
           <TableHeader>
@@ -131,7 +169,12 @@ export default function Bets() {
                   <div className="text-sm">{b.market || "—"}</div>
                   <div className="text-xs text-muted-foreground">{b.selection || ""}</div>
                 </TableCell>
-                <TableCell className="text-sm">{b.bookmaker || "—"}</TableCell>
+                <TableCell className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <BookmakerLogo name={b.bookmaker} size="xs" />
+                    <span className="truncate">{b.bookmaker || "—"}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-right font-mono">{formatNumber(Number(b.odds), 2)}</TableCell>
                 <TableCell className="text-right font-mono">{formatCurrency(Number(b.stake_amount), currency)}</TableCell>
                 <TableCell>
@@ -161,6 +204,7 @@ export default function Bets() {
           </TableBody>
         </Table>
       </div>
+      )}
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>
