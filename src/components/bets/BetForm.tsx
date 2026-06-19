@@ -21,6 +21,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { formatCurrency, formatPercent, toISODateInput } from "@/lib/format";
 import type { Bet, BetInput } from "@/hooks/useBets";
 import { toast } from "sonner";
+import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -158,7 +159,7 @@ export function BetForm({
               </Select>
             </Field>
             <Field label="Casa de aposta">
-              <Input value={bookmaker} onChange={(e) => setBookmaker(e.target.value)} placeholder="Ex: Bet365" />
+              <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
             <Field label="Evento" className="md:col-span-2">
               <Input value={event_name} onChange={(e) => setEventName(e.target.value)} placeholder="Ex: Flamengo x Palmeiras" />
@@ -174,6 +175,19 @@ export function BetForm({
             </Field>
             <Field label={`Stake (${currency})`}>
               <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
+            </Field>
+            <Field label="Unidades">
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                value={profile?.unit_value ? (stake_amount / profile.unit_value).toFixed(2) : ""}
+                onChange={(e) => {
+                  const u = parseFloat(e.target.value) || 0;
+                  if (profile?.unit_value) setStake(+(u * profile.unit_value).toFixed(2));
+                }}
+                placeholder={profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, currency)}` : "—"}
+              />
             </Field>
             <Field label="Status">
               <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
@@ -212,7 +226,7 @@ export function BetForm({
               <Input value={league} onChange={(e) => setLeague(e.target.value)} />
             </Field>
             <Field label="Casa de aposta">
-              <Input value={bookmaker} onChange={(e) => setBookmaker(e.target.value)} />
+              <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
             <Field label="Evento" className="md:col-span-3">
               <Input value={event_name} onChange={(e) => setEventName(e.target.value)} />
@@ -232,6 +246,19 @@ export function BetForm({
             </Field>
             <Field label={`Stake (${currency})`}>
               <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
+            </Field>
+            <Field label="Unidades">
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                value={profile?.unit_value ? (stake_amount / profile.unit_value).toFixed(2) : ""}
+                onChange={(e) => {
+                  const u = parseFloat(e.target.value) || 0;
+                  if (profile?.unit_value) setStake(+(u * profile.unit_value).toFixed(2));
+                }}
+                placeholder={profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, currency)}` : "—"}
+              />
             </Field>
 
             <Field label="Prob. estimada (%)">
