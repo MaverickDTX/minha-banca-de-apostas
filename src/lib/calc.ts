@@ -115,3 +115,52 @@ export function isWinLikeForHitRate(status: BetStatus): "win" | "loss" | "skip" 
   if (status === "cashout") return "win"; // treat as resolved
   return "skip";
 }
+
+/**
+ * Recompute every derived field of a bet given the current values.
+ * Safe to call on any patch — pass the merged "next state" of the bet.
+ */
+export function recomputeBetDerived(b: {
+  status: BetStatus;
+  odds: number;
+  stake_amount: number;
+  closing_odds?: number | null;
+  estimated_probability?: number | null;
+  gross_return?: number | null; // used as cashout return when status === "cashout"
+  kelly_fraction_setting?: number; // user's preferred Kelly fraction (0..1)
+  bankroll?: number;
+}): {
+  net_profit: number;
+  gross_return: number;
+  implied_probability: number;
+  edge: number | null;
+  ev: number | null;
+  kelly_fraction: number | null;
+  recommended_stake: number | null;
+  clv: number | null;
+} {
+  const cashoutReturn =
+    b.status === "cashout" && b.gross_return != null ? Number(b.gross_return) : undefined;
+  const net = computeNetProfit(b.status, b.stake_amount, b.odds, cashoutReturn);
+  const gross = computeGrossReturn(b.status, b.stake_amount, b.odds, cashoutReturn);
+  const implied = impliedProbability(b.odds);
+  const estProb = b.estimated_probability;
+  const edge = estProb != null ? edgeValue(estProb, b.odds) : null;
+  const ev = estProb != null ? expectedValue(estProb, b.odds, b.stake_amount) : null;
+  const kellyDec = estProb != null ? kellyDecimal(estProb, b.odds) : null;
+  const recommended =
+    estProb != null && b.bankroll != null
+      ? kellyStake(estProb, b.odds, b.bankroll, b.kelly_fraction_setting ?? 0.25)
+      : null;
+  const clv = clvPercent(b.odds, b.closing_odds);
+  return {
+    net_profit: net,
+    gross_return: gross,
+    implied_probability: implied,
+    edge,
+    ev,
+    kelly_fraction: kellyDec,
+    recommended_stake: recommended,
+    clv,
+  };
+}
