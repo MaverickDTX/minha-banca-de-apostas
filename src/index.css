@@ -112,7 +112,6 @@
     font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
   .font-mono, .tabular {
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
   }
 }
