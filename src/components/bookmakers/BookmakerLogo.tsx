@@ -1,4 +1,5 @@
-import { getBookmaker, fallbackTile } from "@/lib/bookmakers";
+import { useState } from "react";
+import { getBookmaker, fallbackTile, logoUrl } from "@/lib/bookmakers";
 import { cn } from "@/lib/utils";
 
 type Size = "xs" | "sm" | "md" | "lg";
@@ -9,6 +10,8 @@ const SIZES: Record<Size, string> = {
   md: "h-10 w-10 text-sm",
   lg: "h-14 w-14 text-base",
 };
+
+const PX: Record<Size, number> = { xs: 24, sm: 32, md: 40, lg: 56 };
 
 export function BookmakerLogo({
   name,
@@ -21,6 +24,7 @@ export function BookmakerLogo({
 }) {
   const known = getBookmaker(name);
   const tile = known ?? (name ? { ...fallbackTile(name), name } : null);
+  const [failed, setFailed] = useState(false);
 
   if (!tile) {
     return (
@@ -33,6 +37,30 @@ export function BookmakerLogo({
         aria-hidden
       >
         ?
+      </div>
+    );
+  }
+
+  if (known?.domain && !failed) {
+    const px = PX[size];
+    return (
+      <div
+        className={cn(
+          "rounded-lg bg-white flex items-center justify-center overflow-hidden ring-1 ring-black/10 shadow-sm",
+          SIZES[size],
+          className,
+        )}
+        title={name ?? undefined}
+      >
+        <img
+          src={logoUrl(known.domain, px * 2)}
+          alt={name ?? "Casa"}
+          width={px}
+          height={px}
+          loading="lazy"
+          className="h-full w-full object-contain p-1"
+          onError={() => setFailed(true)}
+        />
       </div>
     );
   }
