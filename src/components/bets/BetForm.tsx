@@ -23,6 +23,8 @@ import type { Bet, BetInput } from "@/hooks/useBets";
 import { toast } from "sonner";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
+import { SelectionAutocomplete } from "@/components/bets/SelectionAutocomplete";
+import { COMMON_MARKETS } from "@/lib/marketSuggestions";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -54,11 +56,15 @@ export function BetForm({
   const [sport, setSport] = useState(initial?.sport ?? "Futebol");
   const [league, setLeague] = useState(initial?.league ?? "");
   const [event_name, setEventName] = useState(initial?.event_name ?? "");
-  function applyEventPick(p: { name: string; isoDate: string | null; sport: string; league: string }) {
+  const [homeTeam, setHomeTeam] = useState<string | undefined>(undefined);
+  const [awayTeam, setAwayTeam] = useState<string | undefined>(undefined);
+  function applyEventPick(p: { name: string; isoDate: string | null; sport: string; league: string; homeTeam?: string; awayTeam?: string }) {
     setEventName(p.name);
     if (p.sport) setSport(p.sport);
     if (p.league) setLeague(p.league);
     if (p.isoDate) setEventDate(toISODateInput(p.isoDate));
+    setHomeTeam(p.homeTeam);
+    setAwayTeam(p.awayTeam);
   }
   const [market, setMarket] = useState(initial?.market ?? "");
   const [selection, setSelection] = useState(initial?.selection ?? "");
@@ -177,10 +183,16 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => setMarket(e.target.value)} placeholder="Ex: Resultado final" />
+              <Input value={market} onChange={(e) => setMarket(e.target.value)} placeholder="Ex: Resultado final" list="market-suggestions" />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
-              <Input value={selection} onChange={(e) => setSelection(e.target.value)} placeholder="Ex: Flamengo vence" />
+              <SelectionAutocomplete
+                value={selection}
+                onChange={setSelection}
+                market={market}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+              />
             </Field>
             <Field label="Odd">
               <Input type="number" step="0.01" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
@@ -248,10 +260,16 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => setMarket(e.target.value)} />
+              <Input value={market} onChange={(e) => setMarket(e.target.value)} list="market-suggestions" />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
-              <Input value={selection} onChange={(e) => setSelection(e.target.value)} />
+              <SelectionAutocomplete
+                value={selection}
+                onChange={setSelection}
+                market={market}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+              />
             </Field>
 
             <Field label="Odd apostada">
@@ -309,6 +327,10 @@ export function BetForm({
           </div>
         </TabsContent>
       </Tabs>
+
+      <datalist id="market-suggestions">
+        {COMMON_MARKETS.map((m) => <option key={m} value={m} />)}
+      </datalist>
 
       <div className="surface p-4 grid md:grid-cols-4 gap-3 text-sm">
         <Calc label="Prob. implícita" value={formatPercent(calc.implied)} />

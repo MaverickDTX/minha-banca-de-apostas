@@ -4,6 +4,8 @@
 const KEY = "3";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 
+import { translateEventName, translateLeague, translateTeamName } from "@/lib/translate";
+
 export type SportEvent = {
   id: string;
   name: string;           // e.g. "Uruguay vs Brazil"
@@ -40,14 +42,16 @@ function toIso(e: RawEvent): string | null {
 }
 
 function normalize(e: RawEvent): SportEvent {
+  const home = translateTeamName(e.strHomeTeam ?? undefined);
+  const away = translateTeamName(e.strAwayTeam ?? undefined);
   return {
     id: e.idEvent,
-    name: e.strEvent,
+    name: translateEventName(e.strEvent, e.strHomeTeam ?? undefined, e.strAwayTeam ?? undefined),
     sport: e.strSport ?? "",
-    league: e.strLeague ?? "",
+    league: translateLeague(e.strLeague ?? ""),
     date: toIso(e),
-    homeTeam: e.strHomeTeam ?? undefined,
-    awayTeam: e.strAwayTeam ?? undefined,
+    homeTeam: home,
+    awayTeam: away,
   };
 }
 
