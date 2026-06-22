@@ -9,6 +9,8 @@ type Pick = {
   isoDate: string | null;
   sport: string;
   league: string;
+  homeTeam?: string;
+  awayTeam?: string;
 };
 
 export function EventAutocomplete({
@@ -54,6 +56,8 @@ export function EventAutocomplete({
       isoDate: ev.date,
       sport: mapSportLabel(ev.sport),
       league: ev.league,
+      homeTeam: ev.homeTeam,
+      awayTeam: ev.awayTeam,
     });
     setOpen(false);
   }
