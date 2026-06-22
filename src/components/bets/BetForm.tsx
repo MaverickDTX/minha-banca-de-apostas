@@ -22,6 +22,7 @@ import { formatCurrency, formatPercent, toISODateInput } from "@/lib/format";
 import type { Bet, BetInput } from "@/hooks/useBets";
 import { toast } from "sonner";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
+import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -53,6 +54,12 @@ export function BetForm({
   const [sport, setSport] = useState(initial?.sport ?? "Futebol");
   const [league, setLeague] = useState(initial?.league ?? "");
   const [event_name, setEventName] = useState(initial?.event_name ?? "");
+  function applyEventPick(p: { name: string; isoDate: string | null; sport: string; league: string }) {
+    setEventName(p.name);
+    if (p.sport) setSport(p.sport);
+    if (p.league) setLeague(p.league);
+    if (p.isoDate) setEventDate(toISODateInput(p.isoDate));
+  }
   const [market, setMarket] = useState(initial?.market ?? "");
   const [selection, setSelection] = useState(initial?.selection ?? "");
   const [bookmaker, setBookmaker] = useState(initial?.bookmaker ?? "");
@@ -162,7 +169,12 @@ export function BetForm({
               <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
             <Field label="Evento" className="md:col-span-2">
-              <Input value={event_name} onChange={(e) => setEventName(e.target.value)} placeholder="Ex: Flamengo x Palmeiras" />
+              <EventAutocomplete
+                value={event_name}
+                onChange={setEventName}
+                onPick={applyEventPick}
+                placeholder="Ex: Uruguai (digite p/ buscar partidas)"
+              />
             </Field>
             <Field label="Mercado">
               <Input value={market} onChange={(e) => setMarket(e.target.value)} placeholder="Ex: Resultado final" />
@@ -229,7 +241,11 @@ export function BetForm({
               <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
             <Field label="Evento" className="md:col-span-3">
-              <Input value={event_name} onChange={(e) => setEventName(e.target.value)} />
+              <EventAutocomplete
+                value={event_name}
+                onChange={setEventName}
+                onPick={applyEventPick}
+              />
             </Field>
             <Field label="Mercado">
               <Input value={market} onChange={(e) => setMarket(e.target.value)} />

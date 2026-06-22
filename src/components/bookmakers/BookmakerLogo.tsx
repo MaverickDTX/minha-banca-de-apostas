@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getBookmaker, fallbackTile, logoUrl } from "@/lib/bookmakers";
+import { getCachedLogoUrl } from "@/lib/logoCache";
 import { cn } from "@/lib/utils";
 
 type Size = "xs" | "sm" | "md" | "lg";
@@ -25,6 +26,22 @@ export function BookmakerLogo({
   const known = getBookmaker(name);
   const tile = known ?? (name ? { ...fallbackTile(name), name } : null);
   const [failed, setFailed] = useState(false);
+  const [src, setSrc] = useState<string | null>(null);
+
+  const domain = known?.domain ?? null;
+  const px = PX[size];
+
+  useEffect(() => {
+    if (!domain) { setSrc(null); return; }
+    let cancelled = false;
+    setFailed(false);
+    getCachedLogoUrl(`${domain}@${px * 2}`, logoUrl(domain, px * 2)).then((url) => {
+      if (cancelled) return;
+      if (url) setSrc(url);
+      else setFailed(true);
+    });
+    return () => { cancelled = true; };
+  }, [domain, px]);
 
   if (!tile) {
     return (
@@ -41,8 +58,7 @@ export function BookmakerLogo({
     );
   }
 
-  if (known?.domain && !failed) {
-    const px = PX[size];
+  if (domain && !failed && src) {
     return (
       <div
         className={cn(
@@ -53,7 +69,7 @@ export function BookmakerLogo({
         title={name ?? undefined}
       >
         <img
-          src={logoUrl(known.domain, px * 2)}
+          src={src}
           alt={name ?? "Casa"}
           width={px}
           height={px}
