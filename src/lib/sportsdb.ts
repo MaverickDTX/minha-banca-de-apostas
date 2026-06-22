@@ -1,0 +1,133 @@
+// TheSportsDB free API (test key "3"). Search events by name/team.
+// Docs: https://www.thesportsdb.com/free_sports_api
+
+const KEY = "3";
+const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
+
+export type SportEvent = {
+  id: string;
+  name: string;           // e.g. "Uruguay vs Brazil"
+  sport: string;          // e.g. "Soccer"
+  league: string;         // e.g. "FIFA World Cup Qualifiers - CONMEBOL"
+  date: string | null;    // ISO string (UTC) when available
+  homeTeam?: string;
+  awayTeam?: string;
+};
+
+type RawEvent = {
+  idEvent: string;
+  strEvent: string;
+  strSport?: string;
+  strLeague?: string;
+  strHomeTeam?: string;
+  strAwayTeam?: string;
+  dateEvent?: string | null;       // YYYY-MM-DD (local league date)
+  strTime?: string | null;         // HH:MM:SS (UTC)
+  strTimestamp?: string | null;    // ISO-ish "YYYY-MM-DDTHH:MM:SS"
+};
+
+function toIso(e: RawEvent): string | null {
+  if (e.strTimestamp) {
+    // strTimestamp is UTC per docs but lacks "Z"
+    const s = e.strTimestamp.includes("T") ? e.strTimestamp : e.strTimestamp.replace(" ", "T");
+    return new Date(s + "Z").toISOString();
+  }
+  if (e.dateEvent) {
+    const t = e.strTime && e.strTime !== "00:00:00" ? e.strTime : "00:00:00";
+    return new Date(`${e.dateEvent}T${t}Z`).toISOString();
+  }
+  return null;
+}
+
+function normalize(e: RawEvent): SportEvent {
+  return {
+    id: e.idEvent,
+    name: e.strEvent,
+    sport: e.strSport ?? "",
+    league: e.strLeague ?? "",
+    date: toIso(e),
+    homeTeam: e.strHomeTeam ?? undefined,
+    awayTeam: e.strAwayTeam ?? undefined,
+  };
+}
+
+const sportCache = new Map<string, SportEvent[]>();
+
+/** Map TheSportsDB sport string to the in-app sport label. */
+export function mapSportLabel(strSport: string): string {
+  const s = strSport.toLowerCase();
+  if (s === "soccer") return "Futebol";
+  if (s === "basketball") return "Basquete";
+  if (s === "tennis") return "Tênis";
+  if (s === "mma" || s === "fighting") return "MMA";
+  if (s === "esports") return "eSports";
+  if (s === "american football") return "NFL";
+  if (s === "volleyball") return "Vôlei";
+  return strSport || "Outro";
+}
+
+/**
+ * Search upcoming/recent events by event name OR team name.
+ * Combines `searchevents` (event-name match) with `searchteams` + `eventsnext`
+ * to also surface games when the user types just a team/country.
+ */
+export async function searchEvents(query: string, signal?: AbortSignal): Promise<SportEvent[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const cached = sportCache.get(q.toLowerCase());
+  if (cached) return cached;
+
+  const results = new Map<string, SportEvent>();
+
+  // 1) Direct event-name search.
+  try {
+    const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(q)}`, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      const arr: RawEvent[] = Array.isArray(json?.event) ? json.event : [];
+      for (const raw of arr) {
+        const ev = normalize(raw);
+        if (!results.has(ev.id)) results.set(ev.id, ev);
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 2) Team search → next 5 matches, for up to 3 best team hits.
+  try {
+    const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(q)}`, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 3) : [];
+      const nexts = await Promise.all(
+        teams.map((t) =>
+          fetch(`${BASE}/eventsnext.php?id=${t.idTeam}`, { signal })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ),
+      );
+      for (const j of nexts) {
+        const arr: RawEvent[] = Array.isArray(j?.events) ? j.events : [];
+        for (const raw of arr) {
+          const ev = normalize(raw);
+          if (!results.has(ev.id)) results.set(ev.id, ev);
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  const list = Array.from(results.values())
+    .sort((a, b) => {
+      const at = a.date ? Date.parse(a.date) : Infinity;
+      const bt = b.date ? Date.parse(b.date) : Infinity;
+      // future first (closest), then past
+      const now = Date.now();
+      const af = at >= now ? 0 : 1;
+      const bf = bt >= now ? 0 : 1;
+      if (af !== bf) return af - bf;
+      return Math.abs(at - now) - Math.abs(bt - now);
+    })
+    .slice(0, 15);
+
+  sportCache.set(q.toLowerCase(), list);
+  return list;
+}
