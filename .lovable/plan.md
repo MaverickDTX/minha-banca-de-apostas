@@ -1,21 +1,47 @@
-## Problema
+# Logos reais das casas de aposta
 
-Os números (R$ 1.010,50, 105,00%, etc.) ainda aparecem com cara de máquina de escrever porque o utilitário `font-mono` do Tailwind injeta sua própria pilha de fontes monoespaçadas (`ui-monospace, SFMono-Regular, Menlo...`) que sobrescreve a regra `.font-mono` customizada no `index.css`. O `.stat-number` usa `@apply font-mono`, então herda a fonte mono nativa do Tailwind.
+## Objetivo
+Substituir os monogramas (quadrado colorido com 2-3 letras) por logos oficiais das casas no card das apostas, com fallback gracioso quando a logo não carregar.
 
-## Solução
+## Abordagem
+Usar o **Clearbit Logo API** (`https://logo.clearbit.com/{domain}`) — gratuito, sem chave, devolve PNG/SVG de alta qualidade a partir do domínio oficial da marca. Não precisa subir nenhum binário ao repositório, nem gerenciar assets.
 
-Sobrescrever o token `fontFamily.mono` do Tailwind no `tailwind.config.ts` para apontar para Inter com `tabular-nums`. Assim qualquer uso de `font-mono` (utilitário ou `@apply`) passa a renderizar em Inter sem serifa, mantendo alinhamento vertical dos dígitos.
+Quando a imagem falhar ao carregar (404, marca sem domínio cadastrado, casa custom digitada pelo usuário), cai automaticamente no tile colorido com monograma que já existe hoje. Assim nada quebra.
 
-### Mudanças
+## Mudanças
 
-1. **`tailwind.config.ts`** — adicionar em `theme.extend`:
-   ```ts
-   fontFamily: {
-     mono: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-     sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-   },
-   ```
+### 1. `src/lib/bookmakers.ts`
+- Adicionar campo `domain?: string` em `BookmakerDef`.
+- Preencher domínios oficiais das 20 casas listadas:
+  - bet365 → `bet365.com`
+  - betano → `betano.com`
+  - betfair → `betfair.com`
+  - sportingbet → `sportingbet.com`
+  - kto → `kto.com`
+  - superbet → `superbet.com`
+  - estrelabet → `estrelabet.com`
+  - pixbet → `pixbet.com`
+  - blaze → `blaze.com`
+  - novibet → `novibet.com`
+  - betnacional → `betnacional.com`
+  - bwin → `bwin.com`
+  - 888sport → `888sport.com`
+  - stake → `stake.com`
+  - galera → `galera.bet`
+  - esportesdasorte → `esportesdasorte.bet.br`
+  - f12bet → `f12.bet`
+  - pinnacle → `pinnacle.com`
+  - betmgm → `betmgm.com`
+  - esportivabet → `esportivabet.com.br`
+- Helper `logoUrl(domain)` → `https://logo.clearbit.com/{domain}`.
 
-2. **`src/index.css`** — simplificar a regra `.font-mono, .tabular` mantendo apenas `font-variant-numeric: tabular-nums` (a família já vem do Tailwind agora), evitando conflito de cascata.
+### 2. `src/components/bookmakers/BookmakerLogo.tsx`
+- Se a casa for conhecida e tiver `domain`, renderiza `<img src={logoUrl}>` dentro de uma tile branca arredondada (fundo claro para acomodar logos coloridos), com `object-contain` e padding.
+- `onError` no `<img>` troca state `failed=true` → renderiza o tile colorido com monograma (comportamento atual) como fallback.
+- Casas custom (sem entry conhecida) ou sem `domain` → tile monograma direto, como hoje.
+- Mantém a API atual (`name`, `size`, `className`) — sem mudanças nos call sites (`BetCard`, `BookmakerSelect`, etc.).
 
-Nenhuma outra mudança de lógica, layout ou componentes.
+## Observações técnicas
+- Clearbit serve via HTTPS, com cache CDN, e suporta `?size=128`. Não precisa proxy.
+- Não há custo, não há rate limit relevante para uso direto no browser.
+- Sem migrações, sem novos pacotes, sem alteração de cálculos ou schema.
