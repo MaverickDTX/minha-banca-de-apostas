@@ -62,7 +62,11 @@ export function BetForm({
     setEventName(p.name);
     if (p.sport) setSport(p.sport);
     if (p.league) setLeague(p.league);
-    if (p.isoDate) setEventDate(toISODateInput(p.isoDate));
+    if (p.isoDate) {
+      const iso = toISODateInput(p.isoDate);
+      setEventDate(iso);
+      setBetDate(iso);
+    }
     setHomeTeam(p.homeTeam);
     setAwayTeam(p.awayTeam);
   }

@@ -1,47 +1,20 @@
-# Logos reais das casas de aposta
+## Ajustes no formulário de aposta
 
-## Objetivo
-Substituir os monogramas (quadrado colorido com 2-3 letras) por logos oficiais das casas no card das apostas, com fallback gracioso quando a logo não carregar.
+### 1. Campo "Seleção" travado após escolha
+Hoje o `SelectionAutocomplete` envolve o `Input` em um `PopoverTrigger asChild`. Isso faz o Radix interceptar cliques/foco do input — após escolher uma sugestão, o popover fecha e clicar novamente para editar abre/fecha o popover em vez de simplesmente posicionar o cursor, dando a sensação de que o valor ficou "permanente".
 
-## Abordagem
-Usar o **Clearbit Logo API** (`https://logo.clearbit.com/{domain}`) — gratuito, sem chave, devolve PNG/SVG de alta qualidade a partir do domínio oficial da marca. Não precisa subir nenhum binário ao repositório, nem gerenciar assets.
+Correção:
+- Remover o `PopoverTrigger` em volta do `Input`. Renderizar o `Input` solto e usar um `PopoverAnchor` invisível ancorado ao mesmo container (mesmo padrão usado em `EventAutocomplete`).
+- Controlar `open` manualmente: abrir em `onFocus`/`onChange`, fechar em `onBlur` (com pequeno timeout para permitir clique na sugestão) ou ao escolher um item.
+- Garantir que digitar sempre filtra/reabre a lista, e que limpar o campo volta a mostrar todas as sugestões.
 
-Quando a imagem falhar ao carregar (404, marca sem domínio cadastrado, casa custom digitada pelo usuário), cai automaticamente no tile colorido com monograma que já existe hoje. Assim nada quebra.
+### 2. Autocomplete também preenche "Data da aposta"
+No `applyEventPick` do `BetForm`, quando o evento escolhido tem `isoDate`:
+- Continuar preenchendo `eventDate` (já funciona).
+- Passar a preencher também `betDate` com o mesmo `isoDate` (data/hora do evento).
 
-## Mudanças
+Sem mudanças em outros campos nem em lógica de cálculo.
 
-### 1. `src/lib/bookmakers.ts`
-- Adicionar campo `domain?: string` em `BookmakerDef`.
-- Preencher domínios oficiais das 20 casas listadas:
-  - bet365 → `bet365.com`
-  - betano → `betano.com`
-  - betfair → `betfair.com`
-  - sportingbet → `sportingbet.com`
-  - kto → `kto.com`
-  - superbet → `superbet.com`
-  - estrelabet → `estrelabet.com`
-  - pixbet → `pixbet.com`
-  - blaze → `blaze.com`
-  - novibet → `novibet.com`
-  - betnacional → `betnacional.com`
-  - bwin → `bwin.com`
-  - 888sport → `888sport.com`
-  - stake → `stake.com`
-  - galera → `galera.bet`
-  - esportesdasorte → `esportesdasorte.bet.br`
-  - f12bet → `f12.bet`
-  - pinnacle → `pinnacle.com`
-  - betmgm → `betmgm.com`
-  - esportivabet → `esportivabet.com.br`
-- Helper `logoUrl(domain)` → `https://logo.clearbit.com/{domain}`.
-
-### 2. `src/components/bookmakers/BookmakerLogo.tsx`
-- Se a casa for conhecida e tiver `domain`, renderiza `<img src={logoUrl}>` dentro de uma tile branca arredondada (fundo claro para acomodar logos coloridos), com `object-contain` e padding.
-- `onError` no `<img>` troca state `failed=true` → renderiza o tile colorido com monograma (comportamento atual) como fallback.
-- Casas custom (sem entry conhecida) ou sem `domain` → tile monograma direto, como hoje.
-- Mantém a API atual (`name`, `size`, `className`) — sem mudanças nos call sites (`BetCard`, `BookmakerSelect`, etc.).
-
-## Observações técnicas
-- Clearbit serve via HTTPS, com cache CDN, e suporta `?size=128`. Não precisa proxy.
-- Não há custo, não há rate limit relevante para uso direto no browser.
-- Sem migrações, sem novos pacotes, sem alteração de cálculos ou schema.
+### Arquivos afetados
+- `src/components/bets/SelectionAutocomplete.tsx` — trocar `PopoverTrigger asChild` por `PopoverAnchor` + controle manual de `open`.
+- `src/components/bets/BetForm.tsx` — em `applyEventPick`, setar `betDate` quando houver `isoDate`.

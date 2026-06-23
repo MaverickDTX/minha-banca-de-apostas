@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { getSelectionSuggestions } from "@/lib/marketSuggestions";
 
 export function SelectionAutocomplete({
@@ -19,6 +19,7 @@ export function SelectionAutocomplete({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const blurTimer = useRef<number | null>(null);
 
   const suggestions = useMemo(
     () => getSelectionSuggestions(market, homeTeam, awayTeam),
@@ -42,21 +43,25 @@ export function SelectionAutocomplete({
   }, [filtered]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <Popover open={open && filtered.length > 0} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
         <Input
           value={value}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
+          onBlur={() => {
+            blurTimer.current = window.setTimeout(() => setOpen(false), 150);
+          }}
           placeholder={placeholder ?? "Ex: Vitória Brasil"}
           autoComplete="off"
         />
-      </PopoverTrigger>
+      </PopoverAnchor>
       {filtered.length > 0 && (
         <PopoverContent
           className="p-0 w-[--radix-popover-trigger-width] max-h-80 overflow-auto"
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={() => setOpen(false)}
         >
           <ul className="py-1">
             {grouped.map(([group, items]) => (
@@ -68,7 +73,12 @@ export function SelectionAutocomplete({
                   <button
                     key={s.label}
                     type="button"
-                    onClick={() => { onChange(s.label); setOpen(false); }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (blurTimer.current) window.clearTimeout(blurTimer.current);
+                      onChange(s.label);
+                      setOpen(false);
+                    }}
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 focus:bg-muted/60 outline-none"
                   >
                     {s.label}
