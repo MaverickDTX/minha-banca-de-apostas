@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { getSelectionSuggestions } from "@/lib/marketSuggestions";
@@ -20,6 +20,14 @@ export function SelectionAutocomplete({
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
+  // quando o mercado muda, recalculamos sugestões; se o input estiver focado,
+  // reabre o popover para o usuário escolher de novo sem precisar clicar fora.
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) {
+      setOpen(true);
+    }
+  }, [market]);
 
   const suggestions = useMemo(
     () => getSelectionSuggestions(market, homeTeam, awayTeam),
@@ -46,9 +54,11 @@ export function SelectionAutocomplete({
     <Popover open={open && filtered.length > 0} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <Input
+          ref={inputRef}
           value={value}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onBlur={() => {
             blurTimer.current = window.setTimeout(() => setOpen(false), 150);
           }}
