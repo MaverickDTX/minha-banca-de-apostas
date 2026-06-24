@@ -28,9 +28,17 @@ export default function NewBet() {
 
   return (
     <div className="space-y-4 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{editing ? "Editar aposta" : "Nova aposta"}</h1>
-        <p className="text-sm text-muted-foreground">Preencha os campos. Os cálculos são automáticos.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{editing ? "Editar aposta" : "Nova aposta"}</h1>
+          <p className="text-sm text-muted-foreground">Preencha os campos. Os cálculos são automáticos.</p>
+        </div>
+        {!editing && (
+          <Button type="button" variant="outline" size="sm" onClick={() => nav(-1)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Cancelar
+          </Button>
+        )}
       </div>
       <div className="surface p-4 md:p-6">
         <BetForm
