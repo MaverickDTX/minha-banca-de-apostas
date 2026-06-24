@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BetForm } from "@/components/bets/BetForm";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { useBet, useCreateBet, useUpdateBet, useBets } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
