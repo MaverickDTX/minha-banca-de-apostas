@@ -72,6 +72,11 @@ export function BetForm({
   }
   const [market, setMarket] = useState(initial?.market ?? "");
   const [selection, setSelection] = useState(initial?.selection ?? "");
+  function changeMarket(v: string) {
+    setMarket(v);
+    // ao trocar o mercado, libera a Seleção para nova escolha
+    setSelection("");
+  }
   const [bookmaker, setBookmaker] = useState(initial?.bookmaker ?? "");
   const [bet_type, setBetType] = useState(initial?.bet_type ?? "simples");
   const [timing, setTiming] = useState(initial?.timing ?? "pre-live");
@@ -187,7 +192,7 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => setMarket(e.target.value)} placeholder="Ex: Resultado final" list="market-suggestions" />
+              <Input value={market} onChange={(e) => changeMarket(e.target.value)} placeholder="Ex: Resultado final" list="market-suggestions" />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
               <SelectionAutocomplete
@@ -264,7 +269,7 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => setMarket(e.target.value)} list="market-suggestions" />
+              <Input value={market} onChange={(e) => changeMarket(e.target.value)} list="market-suggestions" />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
               <SelectionAutocomplete
