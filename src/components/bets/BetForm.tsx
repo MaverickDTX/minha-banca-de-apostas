@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
 import { SelectionAutocomplete } from "@/components/bets/SelectionAutocomplete";
-import { COMMON_MARKETS } from "@/lib/marketSuggestions";
+import { MarketAutocomplete } from "@/components/bets/MarketAutocomplete";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -192,7 +192,7 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => changeMarket(e.target.value)} placeholder="Ex: Resultado final" list="market-suggestions" />
+              <MarketAutocomplete value={market} onChange={changeMarket} placeholder="Ex: Resultado final" />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
               <SelectionAutocomplete
@@ -269,7 +269,7 @@ export function BetForm({
               />
             </Field>
             <Field label="Mercado">
-              <Input value={market} onChange={(e) => changeMarket(e.target.value)} list="market-suggestions" />
+              <MarketAutocomplete value={market} onChange={changeMarket} />
             </Field>
             <Field label="Seleção" className="md:col-span-2">
               <SelectionAutocomplete
@@ -336,10 +336,6 @@ export function BetForm({
           </div>
         </TabsContent>
       </Tabs>
-
-      <datalist id="market-suggestions">
-        {COMMON_MARKETS.map((m) => <option key={m} value={m} />)}
-      </datalist>
 
       <div className="surface p-4 grid md:grid-cols-4 gap-3 text-sm">
         <Calc label="Prob. implícita" value={formatPercent(calc.implied)} />
