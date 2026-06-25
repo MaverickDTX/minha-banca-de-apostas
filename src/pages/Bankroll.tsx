@@ -40,7 +40,8 @@ export default function BankrollPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!amount || amount <= 0) { toast.error("Valor deve ser positivo"); return; }
+    if (!amount) { toast.error("Informe um valor diferente de zero"); return; }
+    if (type !== "adjustment" && amount < 0) { toast.error("Valor deve ser positivo"); return; }
     await createTx.mutateAsync({
       tx_date: new Date(date).toISOString(),
       tx_type: type, amount, bookmaker: book || null, notes: notes || null,
@@ -96,7 +97,11 @@ export default function BankrollPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Valor ({currency})</Label><Input type="number" step="0.01" min={0} value={amount || ""} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} /></div>
+              <div>
+                <Label>Valor ({currency})</Label>
+                <Input type="number" step="0.01" min={type === "adjustment" ? undefined : 0} value={amount || ""} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} />
+                {type === "adjustment" && <p className="text-xs text-muted-foreground mt-1">Use valor negativo para reduzir a banca.</p>}
+              </div>
               <div><Label>Casa de aposta (opcional)</Label><Input value={book} onChange={(e) => setBook(e.target.value)} /></div>
               <div><Label>Observações</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
               <DialogFooter><Button type="submit">Salvar</Button></DialogFooter>
@@ -152,7 +157,7 @@ export default function BankrollPage() {
           <TableBody>
             {txs.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma transação registrada.</TableCell></TableRow>}
             {txs.map((t) => {
-              const isOut = t.tx_type === "withdrawal";
+              const isOut = t.tx_type === "withdrawal" || Number(t.amount) < 0;
               return (
                 <TableRow key={t.id}>
                   <TableCell className="text-xs text-muted-foreground">{formatDateTime(t.tx_date)}</TableCell>
@@ -160,7 +165,7 @@ export default function BankrollPage() {
                   <TableCell className="text-sm">{t.bookmaker || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{t.notes || "—"}</TableCell>
                   <TableCell className={`text-right font-mono ${isOut ? "negative" : "positive"}`}>
-                    {isOut ? "−" : "+"}{formatCurrency(Number(t.amount), currency)}
+                    {isOut ? "−" : "+"}{formatCurrency(Math.abs(Number(t.amount)), currency)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="icon" variant="ghost" onClick={() => deleteTx.mutate(t.id)}><Trash2 className="h-4 w-4" /></Button>

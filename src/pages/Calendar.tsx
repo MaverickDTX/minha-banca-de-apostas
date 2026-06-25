@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useBets } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { isSettled, STATUS_COLORS, STATUS_LABELS } from "@/lib/calc";
-import { formatCurrency, formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDateTime, toLocalDateKey } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +31,7 @@ export default function CalendarPage() {
     for (const b of bets) {
       const d = new Date(b.bet_date);
       if (d.getMonth() !== month || d.getFullYear() !== year) continue;
-      const key = d.toISOString().slice(0, 10);
+      const key = toLocalDateKey(d);
       const cur = m.get(key) ?? { profit: 0, count: 0 };
       cur.count++;
       if (isSettled(b.status)) cur.profit += Number(b.net_profit || 0);
@@ -52,7 +52,7 @@ export default function CalendarPage() {
   const monthProfit = monthBets.filter((b) => isSettled(b.status)).reduce((s, b) => s + Number(b.net_profit || 0), 0);
 
   const dayBets = openDay
-    ? bets.filter((b) => new Date(b.bet_date).toISOString().slice(0, 10) === openDay)
+    ? bets.filter((b) => toLocalDateKey(b.bet_date) === openDay)
     : [];
 
   return (
@@ -79,7 +79,7 @@ export default function CalendarPage() {
         <div className="grid grid-cols-7 gap-2">
           {cells.map((d, i) => {
             if (d == null) return <div key={i} />;
-            const key = new Date(year, month, d).toISOString().slice(0, 10);
+            const key = toLocalDateKey(new Date(year, month, d));
             const info = byDay.get(key);
             const profit = info?.profit ?? 0;
             const count = info?.count ?? 0;
@@ -116,7 +116,7 @@ export default function CalendarPage() {
       <Dialog open={!!openDay} onOpenChange={(o) => !o && setOpenDay(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Apostas em {openDay && new Date(openDay).toLocaleDateString("pt-BR")}</DialogTitle>
+            <DialogTitle>Apostas em {openDay && new Date(`${openDay}T00:00:00`).toLocaleDateString("pt-BR")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {dayBets.map((b) => (

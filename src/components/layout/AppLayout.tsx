@@ -1,11 +1,21 @@
+import { useEffect } from "react";
 import { Outlet, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { Loader2 } from "lucide-react";
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
+  const { data: profile } = useProfile();
+
+  // Aplica o tema salvo no perfil ao carregar / quando muda.
+  useEffect(() => {
+    if (profile?.theme) {
+      document.documentElement.classList.toggle("dark", profile.theme === "dark");
+    }
+  }, [profile?.theme]);
 
   if (loading) {
     return (

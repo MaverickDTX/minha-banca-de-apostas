@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3 } from "lucide-react";
-import { STATUS_COLORS, STATUS_LABELS, recomputeBetDerived, type BetStatus } from "@/lib/calc";
+import { STATUS_COLORS, STATUS_LABELS, computeNetProfit, computeGrossReturn, type BetStatus } from "@/lib/calc";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
 import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
@@ -55,18 +55,18 @@ export default function Bets() {
   }, [filtered]);
 
   async function setStatusQuick(b: Bet, newStatus: BetStatus) {
-    const derived = recomputeBetDerived({
-      status: newStatus,
-      odds: Number(b.odds),
-      stake_amount: Number(b.stake_amount),
-      closing_odds: b.closing_odds,
-      estimated_probability: b.estimated_probability,
-      gross_return: b.gross_return,
-      kelly_fraction_setting: profile?.kelly_fraction ?? 0.25,
-    });
+    // A marcação rápida altera apenas o status: só net/gross dependem dele.
+    // Os demais derivados (edge, ev, kelly, recommended_stake, clv) dependem de
+    // odds/stake/prob/closing — inalterados aqui — então preservamos o que está salvo.
+    const stake = Number(b.stake_amount);
+    const odds = Number(b.odds);
     await updateBet.mutateAsync({
       id: b.id,
-      patch: { status: newStatus, ...derived },
+      patch: {
+        status: newStatus,
+        net_profit: computeNetProfit(newStatus, stake, odds),
+        gross_return: computeGrossReturn(newStatus, stake, odds),
+      },
     });
     toast.success(`Marcada como ${STATUS_LABELS[newStatus]}`);
   }
