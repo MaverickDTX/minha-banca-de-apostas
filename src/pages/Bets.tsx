@@ -189,9 +189,9 @@ export default function Bets() {
                       <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setStatusQuick(b, "green")}><CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Green</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setStatusQuick(b, "red")}><XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Red</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setStatusQuick(b, "void")}><MinusCircle className="h-4 w-4 mr-2" />Marcar Void</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusQuick(b, "green")}><CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Ganha</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusQuick(b, "red")}><XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Perdida</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusQuick(b, "void")}><MinusCircle className="h-4 w-4 mr-2" />Marcar Anulada</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setStatusQuick(b, "pendente")}><RotateCcw className="h-4 w-4 mr-2" />Voltar a pendente</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild><Link to={`/apostas/${b.id}`}><Pencil className="h-4 w-4 mr-2" />Editar</Link></DropdownMenuItem>

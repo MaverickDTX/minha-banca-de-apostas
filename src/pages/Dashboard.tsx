@@ -103,7 +103,7 @@ export default function Dashboard() {
         <StatCard label="Maior drawdown" value={formatCurrency(metrics.maxDrawdown, currency)} tone="negative" />
         <StatCard
           label="Sequência atual"
-          value={metrics.currentStreak.type === "none" ? "—" : `${metrics.currentStreak.count} ${metrics.currentStreak.type === "green" ? "greens" : "reds"}`}
+          value={metrics.currentStreak.type === "none" ? "—" : `${metrics.currentStreak.count} ${metrics.currentStreak.type === "green" ? "ganhas" : "perdidas"}`}
           icon={Flame}
           tone={metrics.currentStreak.type === "green" ? "positive" : metrics.currentStreak.type === "red" ? "negative" : "neutral"}
         />

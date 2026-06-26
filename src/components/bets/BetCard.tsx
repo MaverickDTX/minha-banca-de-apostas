@@ -88,19 +88,19 @@ export function BetCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onStatus(bet, "green")}>
-              <CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Green
+              <CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Ganha
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatus(bet, "red")}>
-              <XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Red
+              <XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Perdida
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatus(bet, "half_green")}>
-              <CheckCircle2 className="h-4 w-4 mr-2 opacity-70" />Half Green
+              <CheckCircle2 className="h-4 w-4 mr-2 opacity-70" />Meio Ganha
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatus(bet, "half_red")}>
-              <XCircle className="h-4 w-4 mr-2 opacity-70" />Half Red
+              <XCircle className="h-4 w-4 mr-2 opacity-70" />Meio Perdida
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatus(bet, "void")}>
-              <MinusCircle className="h-4 w-4 mr-2" />Void
+              <MinusCircle className="h-4 w-4 mr-2" />Anulada
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatus(bet, "pendente")}>
               <RotateCcw className="h-4 w-4 mr-2" />Voltar a pendente

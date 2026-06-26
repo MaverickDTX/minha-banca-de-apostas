@@ -56,6 +56,12 @@ describe("computeGrossReturn", () => {
   it("cashout devolve o retorno informado", () => {
     expect(computeGrossReturn("cashout", 100, 2.5, 120)).toBe(120);
   });
+  it("void devolve a stake (sem lucro nem perda)", () => {
+    expect(computeGrossReturn("void", 100, 2.5)).toBe(100);
+  });
+  it("pendente nao tem retorno ainda", () => {
+    expect(computeGrossReturn("pendente", 100, 2.5)).toBe(0);
+  });
 });
 
 describe("impliedProbability", () => {

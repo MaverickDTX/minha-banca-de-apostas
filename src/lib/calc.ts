@@ -9,11 +9,11 @@ export type BetStatus =
 
 export const STATUS_LABELS: Record<BetStatus, string> = {
   pendente: "Pendente",
-  green: "Green",
-  red: "Red",
-  void: "Void",
-  half_green: "Half Green",
-  half_red: "Half Red",
+  green: "Ganha",
+  red: "Perdida",
+  void: "Anulada",
+  half_green: "Meio Ganha",
+  half_red: "Meio Perdida",
   cashout: "Cashout",
 };
 
@@ -60,7 +60,8 @@ export function computeGrossReturn(
 ): number {
   const net = computeNetProfit(status, stake, odds, cashoutReturn);
   if (status === "red" || status === "half_red") return stake + net;
-  if (status === "void" || status === "pendente") return 0;
+  if (status === "void") return stake;
+  if (status === "pendente") return 0;
   if (status === "cashout") return cashoutReturn ?? 0;
   return stake + net;
 }
