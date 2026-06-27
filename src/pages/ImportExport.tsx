@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
-import { useBets, useCreateBet, type BetInput } from "@/hooks/useBets";
+import { useBets, useCreateBet, useBulkCreateBets, type BetInput, type BetLegInput } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, Upload, FileText, AlertTriangle } from "lucide-react";
-import { computeNetProfit, computeGrossReturn, type BetStatus, STATUS_LABELS } from "@/lib/calc";
+import { computeNetProfit, computeGrossReturn, computeMultipleOdds, computeMultipleStatus, type BetStatus, type LegStatus, STATUS_LABELS } from "@/lib/calc";
 import { toast } from "sonner";
 
 const HEADER = [
   "bet_date","event_date","sport","league","event_name","market","selection","bookmaker",
-  "bet_type","timing","odds","closing_odds","stake_amount","status","estimated_probability","tipster","tags","notes",
+  "bet_type","timing","odds","closing_odds","stake_amount","status","estimated_probability","tipster","tags","notes","legs"
 ];
 
 const TEMPLATE = HEADER.join(",") + "\n" +
-  "2026-06-18 14:00,2026-06-18 16:00,Futebol,Brasileirão,Flamengo x Palmeiras,Resultado final,Flamengo,Bet365,simples,pre-live,2.10,1.95,100,green,55,Tipster X,value,Aposta de exemplo";
+  "2026-06-18 14:00,2026-06-18 16:00,Futebol,Brasileirão,Flamengo x Palmeiras,Resultado final,Flamengo,Bet365,simples,pre-live,2.10,1.95,100,green,55,Tipster X,value,Aposta de exemplo,\"[]\"";
 
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "";
@@ -65,7 +65,111 @@ function parseCsv(text: string): Record<string, string>[] {
   });
 }
 
-type Preview = { row: Record<string, string>; errors: string[]; parsed?: BetInput };
+type Preview = {
+  row: Record<string, string>;
+  errors: string[];
+  parsed?: BetInput;
+  legsCount?: number;
+};
+
+function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): any[] {
+  const result: any[] = [];
+  let currentGroup: {
+    bet_date: string;
+    event_date?: string;
+    sport?: string;
+    league?: string;
+    event_name?: string;
+    market?: string;
+    selection?: string;
+    bookmaker: string;
+    bet_type: string;
+    timing?: string;
+    closing_odds?: string;
+    estimated_probability?: string;
+    tipster?: string;
+    tags?: string;
+    notes?: string;
+    legs: any[];
+  } | null = null;
+
+  for (const row of rows) {
+    const isMult = (row.bet_type || "").toLowerCase() === "multipla" || (row.bet_type || "").toLowerCase() === "múltipla";
+    const hasLegsCol = !!row.legs;
+
+    if (isMult && !hasLegsCol) {
+      const date = row.bet_date;
+      const stake = row.stake_amount;
+      const book = row.bookmaker;
+
+      if (
+        currentGroup &&
+        currentGroup.bet_date === date &&
+        currentGroup.stake_amount === stake &&
+        currentGroup.bookmaker === book
+      ) {
+        currentGroup.legs.push({
+          sport: row.sport,
+          league: row.league,
+          event_name: row.event_name,
+          event_date: row.event_date,
+          market: row.market,
+          selection: row.selection,
+          odds: row.odds,
+          status: row.status,
+          tipster: row.tipster,
+        });
+      } else {
+        currentGroup = {
+          bet_date: date,
+          stake_amount: stake,
+          bookmaker: book,
+          bet_type: "multipla",
+          timing: row.timing,
+          closing_odds: row.closing_odds,
+          estimated_probability: row.estimated_probability,
+          tipster: row.tipster,
+          tags: row.tags,
+          notes: row.notes,
+          legs: [
+            {
+              sport: row.sport,
+              league: row.league,
+              event_name: row.event_name,
+              event_date: row.event_date,
+              market: row.market,
+              selection: row.selection,
+              odds: row.odds,
+              status: row.status,
+              tipster: row.tipster,
+            }
+          ],
+        };
+        result.push(currentGroup);
+      }
+    } else {
+      currentGroup = null;
+      result.push(row);
+    }
+  }
+  return result;
+}
+
+function isDuplicate(parsed: BetInput, existingBets: any[]): boolean {
+  return existingBets.some((b) => {
+    if (b.bet_type !== parsed.bet_type) return false;
+    if (b.bookmaker !== parsed.bookmaker) return false;
+    if (Math.abs(Number(b.stake_amount) - Number(parsed.stake_amount)) > 0.01) return false;
+    if (Math.abs(Number(b.odds) - Number(parsed.odds)) > 0.001) return false;
+    
+    const d1 = new Date(b.bet_date).getTime();
+    const d2 = new Date(parsed.bet_date).getTime();
+    if (Math.abs(d1 - d2) > 60000) return false; // Diferença menor que 1 minuto
+
+    if (b.bet_type === "simples" && (b.event_name || "").trim().toLowerCase() !== (parsed.event_name || "").trim().toLowerCase()) return false;
+    return true;
+  });
+}
 
 export default function ImportExport() {
   useEffect(() => { document.title = "Importar / Exportar · Bankroll Pro"; }, []);
@@ -73,73 +177,199 @@ export default function ImportExport() {
   const { data: txs = [] } = useTransactions();
   const { data: profile } = useProfile();
   const createBet = useCreateBet();
+  const bulkCreateBets = useBulkCreateBets();
   const [preview, setPreview] = useState<Preview[]>([]);
   const [busy, setBusy] = useState(false);
 
-  function validateRow(r: Record<string, string>): Preview {
+  function validateBet(bet: any, existingBets: any[]): Preview {
     const errors: string[] = [];
-    const odds = parseFloat(r.odds);
-    const stake = parseFloat(r.stake_amount);
-    const closing = r.closing_odds ? parseFloat(r.closing_odds) : NaN;
-    const status = (r.status || "pendente").toLowerCase() as BetStatus;
-    if (!r.bet_date) errors.push("data ausente");
-    if (!odds || odds <= 1) errors.push("odd inválida");
-    if (!stake || stake <= 0) errors.push("stake inválida");
-    if (r.closing_odds && (isNaN(closing) || closing <= 1)) errors.push("closing odd inválida");
+    const isMultiple = (bet.bet_type || "").toLowerCase() === "multipla" || (bet.bet_type || "").toLowerCase() === "múltipla";
+    const stake = parseFloat(bet.stake_amount);
+    const date = bet.bet_date ? new Date(bet.bet_date) : null;
+    const status = (bet.status || "pendente").toLowerCase() as BetStatus;
+
+    if (!bet.bet_date) errors.push("data ausente");
+    else if (!date || isNaN(date.getTime())) errors.push("data inválida");
+
+    if (isNaN(stake) || stake <= 0) errors.push("stake inválida");
     if (!STATUS_LABELS[status]) errors.push("status desconhecido");
-    const date = new Date(r.bet_date);
-    if (isNaN(date.getTime())) errors.push("data inválida");
 
-    if (errors.length) return { row: r, errors };
+    let finalOdds = 0;
+    let finalStatus = status;
+    let parsedLegs: BetLegInput[] | undefined = undefined;
 
-    const net = computeNetProfit(status, stake, odds);
-    const gross = computeGrossReturn(status, stake, odds);
+    if (isMultiple) {
+      let legs: any[] = [];
+      if (Array.isArray(bet.legs)) {
+        legs = bet.legs;
+      } else if (typeof bet.legs === "string" && bet.legs.trim()) {
+        try {
+          legs = JSON.parse(bet.legs);
+        } catch (e) {
+          errors.push("legs JSON inválido");
+        }
+      }
+
+      if (legs.length < 2) {
+        errors.push("múltipla precisa de pelo menos 2 pernas");
+      }
+
+      parsedLegs = legs.map((l: any, idx: number) => {
+        const legOdds = parseFloat(l.odds);
+        if (isNaN(legOdds) || legOdds <= 1) {
+          errors.push(`perna ${idx + 1}: odd inválida`);
+        }
+        const legStatus = (l.status || "pendente").toLowerCase() as LegStatus;
+        if (legStatus !== "pendente" && legStatus !== "green" && legStatus !== "red" && legStatus !== "void") {
+          errors.push(`perna ${idx + 1}: status desconhecido (${l.status})`);
+        }
+        return {
+          order_index: l.order_index ?? idx,
+          sport: l.sport || null,
+          league: l.league || null,
+          event_name: l.event_name || null,
+          home_team: l.home_team || null,
+          away_team: l.away_team || null,
+          event_date: l.event_date ? new Date(l.event_date).toISOString() : null,
+          market: l.market || null,
+          selection: l.selection || null,
+          odds: legOdds,
+          status: legStatus,
+          tipster: l.tipster || null,
+        };
+      });
+
+      finalOdds = computeMultipleOdds(parsedLegs);
+      finalStatus = computeMultipleStatus(parsedLegs);
+    } else {
+      const singleOdds = parseFloat(bet.odds);
+      if (isNaN(singleOdds) || singleOdds <= 1) {
+        errors.push("odd inválida");
+      } else {
+        finalOdds = singleOdds;
+      }
+    }
+
+    const closing = bet.closing_odds ? parseFloat(bet.closing_odds) : NaN;
+    if (bet.closing_odds && (isNaN(closing) || closing <= 1)) {
+      errors.push("closing odd inválida");
+    }
+
+    const rowDisplay = {
+      bet_date: bet.bet_date || "",
+      event_name: isMultiple ? `Múltipla (${parsedLegs?.length || 0} pernas)` : (bet.event_name || "—"),
+      odds: String(finalOdds ? finalOdds.toFixed(3) : bet.odds || ""),
+      stake_amount: String(bet.stake_amount || ""),
+      status: finalStatus,
+    };
+
+    if (errors.length === 0) {
+      const tempParsed: BetInput = {
+        bet_date: date!.toISOString(),
+        odds: finalOdds,
+        stake_amount: stake,
+        bookmaker: bet.bookmaker || null,
+        bet_type: isMultiple ? "multipla" : "simples",
+        event_name: isMultiple ? `Múltipla (${parsedLegs?.length || 0} pernas)` : (bet.event_name || null),
+        status: finalStatus,
+      };
+      if (isDuplicate(tempParsed, existingBets)) {
+        errors.push("já importada (duplicada)");
+      }
+    }
+
+    if (errors.length) {
+      return { row: rowDisplay, errors };
+    }
+
+    const net = computeNetProfit(finalStatus, stake, finalOdds);
+    const gross = computeGrossReturn(finalStatus, stake, finalOdds);
+
     const parsed: BetInput = {
-      bet_date: date.toISOString(),
-      event_date: r.event_date ? new Date(r.event_date).toISOString() : null,
-      sport: r.sport || null,
-      league: r.league || null,
-      event_name: r.event_name || null,
-      market: r.market || null,
-      selection: r.selection || null,
-      bookmaker: r.bookmaker || null,
-      bet_type: r.bet_type || "simples",
-      timing: r.timing || "pre-live",
-      odds, closing_odds: r.closing_odds ? closing : null,
+      bet_date: date!.toISOString(),
+      event_date: bet.event_date ? new Date(bet.event_date).toISOString() : null,
+      sport: bet.sport || null,
+      league: bet.league || null,
+      event_name: isMultiple ? `Múltipla (${parsedLegs?.length || 0} pernas)` : (bet.event_name || null),
+      market: bet.market || null,
+      selection: bet.selection || null,
+      bookmaker: bet.bookmaker || null,
+      bet_type: isMultiple ? "multipla" : "simples",
+      timing: bet.timing || "pre-live",
+      odds: finalOdds,
+      closing_odds: !isNaN(closing) ? closing : null,
       stake_amount: stake,
-      status,
+      status: finalStatus,
       gross_return: gross,
       net_profit: net,
-      estimated_probability: r.estimated_probability ? parseFloat(r.estimated_probability) : null,
-      implied_probability: (1 / odds) * 100,
-      tipster: r.tipster || null,
-      tags: r.tags ? r.tags.split(/[|,]/).map((t) => t.trim()).filter(Boolean) : [],
-      notes: r.notes || null,
+      estimated_probability: bet.estimated_probability ? parseFloat(bet.estimated_probability) : null,
+      implied_probability: (1 / finalOdds) * 100,
+      tipster: bet.tipster || null,
+      tags: Array.isArray(bet.tags)
+        ? bet.tags
+        : bet.tags
+          ? String(bet.tags).split(/[|,]/).map((t: string) => t.trim()).filter(Boolean)
+          : [],
+      notes: bet.notes || null,
+      legs: parsedLegs || [],
     };
-    return { row: r, errors: [], parsed };
+
+    return {
+      row: rowDisplay,
+      errors: [],
+      parsed,
+      legsCount: parsedLegs?.length,
+    };
   }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isJson = file.name.endsWith(".json");
     file.text().then((txt) => {
-      const rows = parseCsv(txt);
-      setPreview(rows.map(validateRow));
+      try {
+        if (isJson) {
+          const data = JSON.parse(txt);
+          if (!Array.isArray(data)) {
+            toast.error("O arquivo JSON deve conter uma lista de apostas.");
+            return;
+          }
+          setPreview(data.map((b: any) => validateBet(b, bets)));
+        } else {
+          const rows = parseCsv(txt);
+          const grouped = groupConsecutiveCsvMultiples(rows);
+          setPreview(grouped.map((b: any) => validateBet(b, bets)));
+        }
+      } catch (err) {
+        toast.error("Erro ao processar o arquivo. Verifique o formato.");
+        console.error(err);
+      }
     });
     e.target.value = "";
   }
 
   async function confirmImport() {
-    const valid = preview.filter((p) => p.errors.length === 0 && p.parsed);
+    const valid = preview.filter((p) => p.errors.length === 0 && p.parsed).map(p => p.parsed!);
     if (!valid.length) { toast.error("Nenhuma linha válida para importar."); return; }
     setBusy(true);
-    for (const p of valid) {
-      await createBet.mutateAsync(p.parsed!);
+    try {
+      // Importar em lotes de 200 para evitar limites do PostgREST
+      const CHUNK_SIZE = 200;
+      let count = 0;
+      for (let i = 0; i < valid.length; i += CHUNK_SIZE) {
+        const chunk = valid.slice(i, i + CHUNK_SIZE);
+        count += await bulkCreateBets.mutateAsync(chunk);
+      }
+      toast.success(`${count} apostas importadas.`);
+      setPreview([]);
+    } catch (e) {
+      toast.error("Erro ao importar apostas. Verifique o console.");
+      console.error(e);
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    toast.success(`${valid.length} apostas importadas.`);
-    setPreview([]);
   }
+
 
   const errors = preview.filter((p) => p.errors.length > 0).length;
 
@@ -159,12 +389,12 @@ export default function ImportExport() {
           <div className="text-xs text-muted-foreground border border-border rounded p-2 font-mono break-all">
             {HEADER.join(", ")}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <label className="inline-flex">
-              <input type="file" accept=".csv" onChange={onFile} className="hidden" />
-              <Button asChild><span><Upload className="h-4 w-4 mr-2" />Escolher CSV</span></Button>
+              <input type="file" accept=".csv, .json" onChange={onFile} className="hidden" />
+              <Button asChild className="w-full sm:w-auto"><span><Upload className="h-4 w-4 mr-2" />Escolher arquivo</span></Button>
             </label>
-            <Button variant="outline" onClick={() => download("modelo-bankroll-pro.csv", TEMPLATE)}>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => download("modelo-bankroll-pro.csv", TEMPLATE)}>
               <FileText className="h-4 w-4 mr-2" />Baixar modelo
             </Button>
           </div>
@@ -199,6 +429,8 @@ export default function ImportExport() {
           </div>
           <p className="text-xs text-muted-foreground">Moeda: {profile?.currency ?? "BRL"}</p>
         </div>
+
+
       </div>
 
       {preview.length > 0 && (

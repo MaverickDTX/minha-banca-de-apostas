@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { BetForm } from "@/components/bets/BetForm";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { useBet, useCreateBet, useUpdateBet, useBets } from "@/hooks/useBets";
+import { useBet, useBetLegs, useCreateBet, useUpdateBet, useBets } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
 import { computeBankroll } from "@/lib/metrics";
@@ -17,6 +17,7 @@ export default function NewBet() {
   const create = useCreateBet();
   const update = useUpdateBet();
   const { data: bet } = useBet(id);
+  const { data: betLegs } = useBetLegs(id);
   const { data: bets = [] } = useBets();
   const { data: txs = [] } = useTransactions();
   const { data: profile } = useProfile();
@@ -43,6 +44,7 @@ export default function NewBet() {
       <div className="surface p-4 md:p-6">
         <BetForm
           initial={bet ?? undefined}
+          initialLegs={betLegs}
           bankrollNow={bank.current}
           submitLabel={editing ? "Atualizar aposta" : "Salvar aposta"}
           onSubmit={async (data) => {
@@ -53,7 +55,7 @@ export default function NewBet() {
               await create.mutateAsync(data);
               toast.success("Aposta registrada");
             }
-            nav("/apostas");
+            nav({ pathname: "/apostas", search: window.location.search });
           }}
         />
       </div>

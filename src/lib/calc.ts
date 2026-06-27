@@ -117,6 +117,39 @@ export function isWinLikeForHitRate(status: BetStatus): "win" | "loss" | "skip" 
   return "skip";
 }
 
+/** Status possível de uma perna (leg) dentro de uma aposta múltipla — subconjunto de BetStatus. */
+export type LegStatus = "pendente" | "green" | "red" | "void";
+
+export interface BetLeg {
+  odds: number;
+  status: LegStatus;
+}
+
+/**
+ * Odd total de uma múltipla: produto das odds de todas as pernas não anuladas.
+ * Pernas com status "void" são tratadas como inexistentes (odd efetiva 1.0).
+ */
+export function computeMultipleOdds(legs: BetLeg[]): number {
+  return legs
+    .filter((l) => l.status !== "void")
+    .reduce((acc, l) => acc * Number(l.odds || 1), 1);
+}
+
+/**
+ * Status geral derivado de uma múltipla a partir das pernas:
+ * - qualquer perna "red" => a múltipla toda é "red";
+ * - senão, qualquer perna "pendente" => a múltipla está "pendente";
+ * - senão (todas green ou void) => "green".
+ * Uma múltipla onde todas as pernas são "void" é tratada como "void".
+ */
+export function computeMultipleStatus(legs: BetLeg[]): BetStatus {
+  if (legs.length === 0) return "pendente";
+  if (legs.some((l) => l.status === "red")) return "red";
+  if (legs.some((l) => l.status === "pendente")) return "pendente";
+  if (legs.every((l) => l.status === "void")) return "void";
+  return "green";
+}
+
 /**
  * Recompute every derived field of a bet given the current values.
  * Safe to call on any patch — pass the merged "next state" of the bet.
@@ -130,6 +163,8 @@ export function recomputeBetDerived(b: {
   gross_return?: number | null; // used as cashout return when status === "cashout"
   kelly_fraction_setting?: number; // user's preferred Kelly fraction (0..1)
   bankroll?: number;
+  /** Quando informado (aposta múltipla), odds e status são derivados das pernas. */
+  legs?: BetLeg[];
 }): {
   net_profit: number;
   gross_return: number;
@@ -139,21 +174,25 @@ export function recomputeBetDerived(b: {
   kelly_fraction: number | null;
   recommended_stake: number | null;
   clv: number | null;
+  status: BetStatus;
+  odds: number;
 } {
+  const status = b.legs && b.legs.length > 0 ? computeMultipleStatus(b.legs) : b.status;
+  const odds = b.legs && b.legs.length > 0 ? computeMultipleOdds(b.legs) : b.odds;
   const cashoutReturn =
-    b.status === "cashout" && b.gross_return != null ? Number(b.gross_return) : undefined;
-  const net = computeNetProfit(b.status, b.stake_amount, b.odds, cashoutReturn);
-  const gross = computeGrossReturn(b.status, b.stake_amount, b.odds, cashoutReturn);
-  const implied = impliedProbability(b.odds);
+    status === "cashout" && b.gross_return != null ? Number(b.gross_return) : undefined;
+  const net = computeNetProfit(status, b.stake_amount, odds, cashoutReturn);
+  const gross = computeGrossReturn(status, b.stake_amount, odds, cashoutReturn);
+  const implied = impliedProbability(odds);
   const estProb = b.estimated_probability;
-  const edge = estProb != null ? edgeValue(estProb, b.odds) : null;
-  const ev = estProb != null ? expectedValue(estProb, b.odds, b.stake_amount) : null;
-  const kellyDec = estProb != null ? kellyDecimal(estProb, b.odds) : null;
+  const edge = estProb != null ? edgeValue(estProb, odds) : null;
+  const ev = estProb != null ? expectedValue(estProb, odds, b.stake_amount) : null;
+  const kellyDec = estProb != null ? kellyDecimal(estProb, odds) : null;
   const recommended =
     estProb != null && b.bankroll != null
-      ? kellyStake(estProb, b.odds, b.bankroll, b.kelly_fraction_setting ?? 0.25)
+      ? kellyStake(estProb, odds, b.bankroll, b.kelly_fraction_setting ?? 0.25)
       : null;
-  const clv = clvPercent(b.odds, b.closing_odds);
+  const clv = clvPercent(odds, b.closing_odds);
   return {
     net_profit: net,
     gross_return: gross,
@@ -163,5 +202,7 @@ export function recomputeBetDerived(b: {
     kelly_fraction: kellyDec,
     recommended_stake: recommended,
     clv,
+    status,
+    odds,
   };
 }

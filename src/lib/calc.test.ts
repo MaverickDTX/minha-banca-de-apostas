@@ -11,6 +11,8 @@ import {
   isSettled,
   isWinLikeForHitRate,
   recomputeBetDerived,
+  computeMultipleOdds,
+  computeMultipleStatus,
 } from "./calc";
 
 describe("computeNetProfit", () => {
@@ -198,5 +200,84 @@ describe("recomputeBetDerived", () => {
     });
     expect(d.net_profit).toBe(30);
     expect(d.gross_return).toBe(130);
+  });
+
+  it("com legs informados, deriva odds e status da múltipla", () => {
+    const d = recomputeBetDerived({
+      status: "pendente", // ignorado quando há legs
+      odds: 1, // ignorado quando há legs
+      stake_amount: 100,
+      legs: [
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "green" },
+      ],
+    });
+    expect(d.odds).toBe(3);
+    expect(d.status).toBe("green");
+    expect(d.net_profit).toBe(200);
+    expect(d.gross_return).toBe(300);
+  });
+});
+
+describe("computeMultipleOdds", () => {
+  it("multiplica as odds de todas as pernas", () => {
+    expect(
+      computeMultipleOdds([
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "pendente" },
+        { odds: 1.2, status: "red" },
+      ]),
+    ).toBeCloseTo(3.6, 6);
+  });
+  it("ignora pernas void no produto (odd efetiva 1.0)", () => {
+    expect(
+      computeMultipleOdds([
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "void" },
+        { odds: 3, status: "green" },
+      ]),
+    ).toBe(6);
+  });
+  it("lista vazia retorna 1", () => {
+    expect(computeMultipleOdds([])).toBe(1);
+  });
+});
+
+describe("computeMultipleStatus", () => {
+  it("qualquer perna red torna a múltipla red", () => {
+    expect(
+      computeMultipleStatus([
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "red" },
+      ]),
+    ).toBe("red");
+  });
+  it("sem red, qualquer pendente mantém a múltipla pendente", () => {
+    expect(
+      computeMultipleStatus([
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "pendente" },
+      ]),
+    ).toBe("pendente");
+  });
+  it("todas green (ou void) torna a múltipla green", () => {
+    expect(
+      computeMultipleStatus([
+        { odds: 2, status: "green" },
+        { odds: 1.5, status: "void" },
+        { odds: 1.3, status: "green" },
+      ]),
+    ).toBe("green");
+  });
+  it("todas void torna a múltipla void", () => {
+    expect(
+      computeMultipleStatus([
+        { odds: 2, status: "void" },
+        { odds: 1.5, status: "void" },
+      ]),
+    ).toBe("void");
+  });
+  it("lista vazia retorna pendente", () => {
+    expect(computeMultipleStatus([])).toBe("pendente");
   });
 });

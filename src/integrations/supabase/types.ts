@@ -47,6 +47,71 @@ export type Database = {
         }
         Relationships: []
       }
+      bet_legs: {
+        Row: {
+          away_team: string | null
+          bet_id: string
+          created_at: string
+          event_date: string | null
+          event_name: string | null
+          home_team: string | null
+          id: string
+          league: string | null
+          market: string | null
+          odds: number
+          order_index: number
+          selection: string | null
+          sport: string | null
+          status: string
+          tipster: string | null
+          updated_at: string
+        }
+        Insert: {
+          away_team?: string | null
+          bet_id: string
+          created_at?: string
+          event_date?: string | null
+          event_name?: string | null
+          home_team?: string | null
+          id?: string
+          league?: string | null
+          market?: string | null
+          odds: number
+          order_index?: number
+          selection?: string | null
+          sport?: string | null
+          status?: string
+          tipster?: string | null
+          updated_at?: string
+        }
+        Update: {
+          away_team?: string | null
+          bet_id?: string
+          created_at?: string
+          event_date?: string | null
+          event_name?: string | null
+          home_team?: string | null
+          id?: string
+          league?: string | null
+          market?: string | null
+          odds?: number
+          order_index?: number
+          selection?: string | null
+          sport?: string | null
+          status?: string
+          tipster?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bet_legs_bet_id_fkey"
+            columns: ["bet_id"]
+            isOneToOne: false
+            referencedRelation: "bets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bets: {
         Row: {
           bet_date: string

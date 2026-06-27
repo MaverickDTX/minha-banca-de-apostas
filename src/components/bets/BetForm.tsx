@@ -6,25 +6,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  computeNetProfit,
-  computeGrossReturn,
-  edgeValue,
-  expectedValue,
-  impliedProbability,
-  kellyDecimal,
-  kellyStake,
+  recomputeBetDerived,
   clvPercent,
   STATUS_LABELS,
   type BetStatus,
+  type BetLeg,
 } from "@/lib/calc";
 import { useProfile } from "@/hooks/useProfile";
 import { formatCurrency, formatPercent, toISODateInput } from "@/lib/format";
-import type { Bet, BetInput } from "@/hooks/useBets";
+import type { Bet, BetInput, BetLegRow } from "@/hooks/useBets";
 import { toast } from "sonner";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
 import { SelectionAutocomplete } from "@/components/bets/SelectionAutocomplete";
 import { MarketAutocomplete } from "@/components/bets/MarketAutocomplete";
+import { LegsEditor, makeEmptyLeg, type EditableLeg } from "@/components/bets/LegsEditor";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -39,11 +35,14 @@ const TIMING = [
 
 export function BetForm({
   initial,
+  initialLegs,
   bankrollNow,
   onSubmit,
   submitLabel = "Salvar aposta",
 }: {
   initial?: Partial<Bet>;
+  /** Pernas existentes (edição de uma múltipla já salva). */
+  initialLegs?: BetLegRow[];
   bankrollNow: number;
   onSubmit: (data: BetInput) => Promise<void> | void;
   submitLabel?: string;
@@ -97,21 +96,63 @@ export function BetForm({
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [external_link, setExternalLink] = useState(initial?.external_link ?? "");
 
+  const [legs, setLegs] = useState<EditableLeg[]>(() => {
+    if (initialLegs && initialLegs.length > 0) {
+      return initialLegs.map((l) => ({
+        key: l.id,
+        sport: l.sport ?? "Futebol",
+        league: l.league ?? "",
+        event_name: l.event_name ?? "",
+        home_team: l.home_team ?? undefined,
+        away_team: l.away_team ?? undefined,
+        event_date: toISODateInput(l.event_date ?? ""),
+        market: l.market ?? "",
+        selection: l.selection ?? "",
+        odds: Number(l.odds),
+        status: l.status,
+        tipster: l.tipster ?? "",
+      }));
+    }
+    return [];
+  });
+  const isMultiple = bet_type === "multipla";
+
+  const legsAsBetLeg: BetLeg[] = useMemo(
+    () => legs.map((l) => ({ odds: l.odds, status: l.status })),
+    [legs],
+  );
+
   const calc = useMemo(() => {
-    const implied = impliedProbability(odds);
-    const edge = estimated_probability != null ? edgeValue(estimated_probability, odds) : null;
-    const ev = estimated_probability != null ? expectedValue(estimated_probability, odds, stake_amount) : null;
-    const kellyDec = estimated_probability != null ? kellyDecimal(estimated_probability, odds) : null;
-    const recommended = estimated_probability != null
-      ? kellyStake(estimated_probability, odds, bankrollNow, profile?.kelly_fraction ?? 0.25)
-      : null;
-    const clv = clvPercent(odds, closing_odds);
-    const potentialReturn = stake_amount * odds;
-    const net = computeNetProfit(status, stake_amount, odds, cashoutReturn);
-    const gross = computeGrossReturn(status, stake_amount, odds, cashoutReturn);
+    const derived = recomputeBetDerived({
+      status,
+      odds,
+      stake_amount,
+      closing_odds: closing_odds ?? null,
+      estimated_probability: estimated_probability ?? null,
+      gross_return: cashoutReturn ?? null,
+      kelly_fraction_setting: profile?.kelly_fraction ?? 0.25,
+      bankroll: bankrollNow,
+      legs: isMultiple ? legsAsBetLeg : undefined,
+    });
+    const effectiveOdds = derived.odds;
+    const clv = clvPercent(effectiveOdds, closing_odds);
+    const potentialReturn = stake_amount * effectiveOdds;
     const stakeOverBankrollPct = bankrollNow > 0 ? (stake_amount / bankrollNow) * 100 : 0;
-    return { implied, edge, ev, kellyDec, recommended, clv, potentialReturn, net, gross, stakeOverBankrollPct };
-  }, [odds, closing_odds, stake_amount, estimated_probability, status, cashoutReturn, bankrollNow, profile?.kelly_fraction]);
+    return {
+      implied: derived.implied_probability,
+      edge: derived.edge,
+      ev: derived.ev,
+      kellyDec: derived.kelly_fraction,
+      recommended: derived.recommended_stake,
+      clv,
+      potentialReturn,
+      net: derived.net_profit,
+      gross: derived.gross_return,
+      stakeOverBankrollPct,
+      effectiveOdds,
+      effectiveStatus: derived.status,
+    };
+  }, [odds, closing_odds, stake_amount, estimated_probability, status, cashoutReturn, bankrollNow, profile?.kelly_fraction, isMultiple, legsAsBetLeg]);
 
   useEffect(() => {
     if (profile?.unit_value && stake_amount === 0 && !initial) {
@@ -121,7 +162,12 @@ export function BetForm({
   }, [profile?.unit_value]);
 
   function validate(): string | null {
-    if (!odds || odds <= 1) return "A odd deve ser maior que 1.00";
+    if (isMultiple) {
+      if (legs.length < 2) return "Uma múltipla precisa de ao menos 2 pernas";
+      if (legs.some((l) => !l.odds || l.odds <= 1)) return "Todas as pernas precisam de odd maior que 1.00";
+    } else {
+      if (!odds || odds <= 1) return "A odd deve ser maior que 1.00";
+    }
     if (!stake_amount || stake_amount <= 0) return "A stake deve ser positiva";
     if (closing_odds != null && closing_odds <= 1) return "Closing odd deve ser maior que 1.00";
     if (estimated_probability != null && (estimated_probability < 0 || estimated_probability > 100))
@@ -143,11 +189,12 @@ export function BetForm({
       event_date: eventDate ? new Date(eventDate).toISOString() : null,
       sport, league, event_name, market, selection, bookmaker,
       bet_type, timing,
-      odds, closing_odds: closing_odds ?? null,
+      odds: isMultiple ? calc.effectiveOdds : odds,
+      closing_odds: closing_odds ?? null,
       stake_amount,
       stake_units: profile?.unit_value ? stake_amount / profile.unit_value : null,
       unit_value_at_bet: profile?.unit_value ?? null,
-      status,
+      status: isMultiple ? calc.effectiveStatus : status,
       gross_return: calc.gross,
       net_profit: calc.net,
       estimated_probability: estimated_probability ?? null,
@@ -159,6 +206,22 @@ export function BetForm({
       clv: calc.clv,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       tipster, notes, external_link,
+      legs: isMultiple
+        ? legs.map((l, idx) => ({
+            order_index: idx,
+            sport: l.sport || null,
+            league: l.league || null,
+            event_name: l.event_name || null,
+            home_team: l.home_team || null,
+            away_team: l.away_team || null,
+            event_date: l.event_date ? new Date(l.event_date).toISOString() : null,
+            market: l.market || null,
+            selection: l.selection || null,
+            odds: l.odds,
+            status: l.status,
+            tipster: l.tipster || null,
+          }))
+        : [],
     };
     await onSubmit(data);
   }
@@ -174,38 +237,50 @@ export function BetForm({
         <TabsContent value="basico" className="space-y-4 pt-4">
           <div className="grid md:grid-cols-3 gap-3">
             <FieldDate label="Data da aposta" value={betDate} onChange={setBetDate} />
-            <Field label="Esporte">
-              <Select value={sport} onValueChange={setSport}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{SPORTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </Field>
             <Field label="Casa de aposta">
               <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
-            <Field label="Evento" className="md:col-span-2">
-              <EventAutocomplete
-                value={event_name}
-                onChange={setEventName}
-                onPick={applyEventPick}
-                placeholder="Ex: Uruguai (digite p/ buscar partidas)"
-              />
+            <Field label="Tipo de aposta">
+              <Select value={bet_type} onValueChange={setBetType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{BET_TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+              </Select>
             </Field>
-            <Field label="Mercado">
-              <MarketAutocomplete value={market} onChange={changeMarket} placeholder="Ex: Resultado final" />
-            </Field>
-            <Field label="Seleção" className="md:col-span-2">
-              <SelectionAutocomplete
-                value={selection}
-                onChange={setSelection}
-                market={market}
-                homeTeam={homeTeam}
-                awayTeam={awayTeam}
-              />
-            </Field>
-            <Field label="Odd">
-              <Input type="number" step="0.01" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
-            </Field>
+
+            {!isMultiple && (
+              <>
+                <Field label="Esporte">
+                  <Select value={sport} onValueChange={setSport}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{SPORTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Evento" className="md:col-span-2">
+                  <EventAutocomplete
+                    value={event_name}
+                    onChange={setEventName}
+                    onPick={applyEventPick}
+                    placeholder="Ex: Uruguai (digite p/ buscar partidas)"
+                  />
+                </Field>
+                <Field label="Mercado">
+                  <MarketAutocomplete value={market} onChange={changeMarket} placeholder="Ex: Resultado final" />
+                </Field>
+                <Field label="Seleção" className="md:col-span-2">
+                  <SelectionAutocomplete
+                    value={selection}
+                    onChange={setSelection}
+                    market={market}
+                    homeTeam={homeTeam}
+                    awayTeam={awayTeam}
+                  />
+                </Field>
+                <Field label="Odd">
+                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
+                </Field>
+              </>
+            )}
+
             <Field label={`Stake (${currency})`}>
               <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
             </Field>
@@ -222,15 +297,30 @@ export function BetForm({
                 placeholder={profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, currency)}` : "—"}
               />
             </Field>
-            <Field label="Status">
-              <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
+            {!isMultiple && (
+              <Field label="Status">
+                <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </div>
+
+          {isMultiple && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Pernas da múltipla</Label>
+                <div className="text-xs text-muted-foreground">
+                  Odd total: <span className="font-mono font-semibold text-foreground">{calc.effectiveOdds.toFixed(3)}</span>
+                  {" · "}Status: <span className="font-medium text-foreground">{STATUS_LABELS[calc.effectiveStatus]}</span>
+                </div>
+              </div>
+              <LegsEditor legs={legs} onChange={setLegs} />
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="avancado" className="space-y-4 pt-4">
@@ -261,31 +351,34 @@ export function BetForm({
             <Field label="Casa de aposta">
               <BookmakerSelect value={bookmaker} onChange={setBookmaker} />
             </Field>
-            <Field label="Evento" className="md:col-span-3">
-              <EventAutocomplete
-                value={event_name}
-                onChange={setEventName}
-                onPick={applyEventPick}
-              />
-            </Field>
-            <Field label="Mercado">
-              <MarketAutocomplete value={market} onChange={changeMarket} />
-            </Field>
-            <Field label="Seleção" className="md:col-span-2">
-              <SelectionAutocomplete
-                value={selection}
-                onChange={setSelection}
-                market={market}
-                homeTeam={homeTeam}
-                awayTeam={awayTeam}
-              />
-            </Field>
-
-            <Field label="Odd apostada">
-              <Input type="number" step="0.01" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
-            </Field>
+            {!isMultiple && (
+              <>
+                <Field label="Evento" className="md:col-span-3">
+                  <EventAutocomplete
+                    value={event_name}
+                    onChange={setEventName}
+                    onPick={applyEventPick}
+                  />
+                </Field>
+                <Field label="Mercado">
+                  <MarketAutocomplete value={market} onChange={changeMarket} />
+                </Field>
+                <Field label="Seleção" className="md:col-span-2">
+                  <SelectionAutocomplete
+                    value={selection}
+                    onChange={setSelection}
+                    market={market}
+                    homeTeam={homeTeam}
+                    awayTeam={awayTeam}
+                  />
+                </Field>
+                <Field label="Odd apostada">
+                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
+                </Field>
+              </>
+            )}
             <Field label="Closing odd">
-              <Input type="number" step="0.01" min={1.01} value={closing_odds ?? ""} onChange={(e) => setClosingOdds(e.target.value ? parseFloat(e.target.value) : undefined)} />
+              <Input type="number" step="0.001" min={1.01} value={closing_odds ?? ""} onChange={(e) => setClosingOdds(e.target.value ? parseFloat(e.target.value) : undefined)} />
             </Field>
             <Field label={`Stake (${currency})`}>
               <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
@@ -307,15 +400,17 @@ export function BetForm({
             <Field label="Prob. estimada (%)">
               <Input type="number" step="0.1" min={0} max={100} value={estimated_probability ?? ""} onChange={(e) => setEstProb(e.target.value ? parseFloat(e.target.value) : undefined)} />
             </Field>
-            <Field label="Status">
-              <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            {status === "cashout" && (
+            {!isMultiple && (
+              <Field label="Status">
+                <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {!isMultiple && status === "cashout" && (
               <Field label="Retorno do cashout">
                 <Input type="number" step="0.01" value={cashoutReturn ?? ""} onChange={(e) => setCashoutReturn(e.target.value ? parseFloat(e.target.value) : undefined)} />
               </Field>
@@ -334,13 +429,26 @@ export function BetForm({
               <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} rows={3} />
             </Field>
           </div>
+
+          {isMultiple && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Pernas da múltipla</Label>
+                <div className="text-xs text-muted-foreground">
+                  Odd total: <span className="font-mono font-semibold text-foreground">{calc.effectiveOdds.toFixed(3)}</span>
+                  {" · "}Status: <span className="font-medium text-foreground">{STATUS_LABELS[calc.effectiveStatus]}</span>
+                </div>
+              </div>
+              <LegsEditor legs={legs} onChange={setLegs} />
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
       <div className="surface p-4 grid md:grid-cols-4 gap-3 text-sm">
         <Calc label="Prob. implícita" value={formatPercent(calc.implied)} />
         <Calc label="Retorno potencial" value={formatCurrency(calc.potentialReturn, currency)} />
-        <Calc label="Lucro potencial" value={formatCurrency(stake_amount * (odds - 1), currency)} />
+        <Calc label="Lucro potencial" value={formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency)} />
         <Calc label="Stake / banca" value={formatPercent(calc.stakeOverBankrollPct)} tone={calc.stakeOverBankrollPct > (profile?.stake_warning_percent ?? 5) ? "negative" : "neutral"} />
         {calc.edge != null && <Calc label="Edge" value={formatPercent(calc.edge)} tone={calc.edge > 0 ? "positive" : "negative"} />}
         {calc.ev != null && <Calc label="EV" value={formatCurrency(calc.ev, currency)} tone={calc.ev > 0 ? "positive" : "negative"} />}
