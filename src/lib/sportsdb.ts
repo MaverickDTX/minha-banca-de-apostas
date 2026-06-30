@@ -96,21 +96,32 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     }
   } catch { /* ignore */ }
 
-  // 2) Team search → next 5 matches, for up to 3 best team hits.
+  // 2) Team search → next 5 AND last 5 matches, for up to 3 best team hits.
+  //    "Next" covers upcoming games; "last" covers recently played ones, so
+  //    bets logged after the fact can still be autocompleted.
   try {
     const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(q)}`, { signal });
     if (res.ok) {
       const json = await res.json();
       const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 3) : [];
-      const nexts = await Promise.all(
-        teams.map((t) =>
-          fetch(`${BASE}/eventsnext.php?id=${t.idTeam}`, { signal })
-            .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null),
+      const [nexts, lasts] = await Promise.all([
+        Promise.all(
+          teams.map((t) =>
+            fetch(`${BASE}/eventsnext.php?id=${t.idTeam}`, { signal })
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ),
         ),
-      );
-      for (const j of nexts) {
-        const arr: RawEvent[] = Array.isArray(j?.events) ? j.events : [];
+        Promise.all(
+          teams.map((t) =>
+            fetch(`${BASE}/eventslast.php?id=${t.idTeam}`, { signal })
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ),
+        ),
+      ]);
+      for (const j of [...nexts, ...lasts]) {
+        const arr: RawEvent[] = Array.isArray(j?.events) ? j.events : Array.isArray(j?.results) ? j.results : [];
         for (const raw of arr) {
           const ev = normalize(raw);
           if (!results.has(ev.id)) results.set(ev.id, ev);

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { toast } from "sonner";
 
 const KELLY_OPTIONS = [
@@ -28,6 +29,7 @@ export default function SettingsPage() {
     kelly_fraction: 0.25,
     stake_warning_percent: 5,
     theme: "dark",
+    default_bookmaker: "" as string,
   });
 
   useEffect(() => {
@@ -42,13 +44,14 @@ export default function SettingsPage() {
         kelly_fraction: Number(profile.kelly_fraction),
         stake_warning_percent: Number(profile.stake_warning_percent),
         theme: profile.theme,
+        default_bookmaker: profile.default_bookmaker ?? "",
       });
     }
   }, [profile]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    await update.mutateAsync(form);
+    await update.mutateAsync({ ...form, default_bookmaker: form.default_bookmaker || null });
     toast.success("Configurações salvas");
     document.documentElement.classList.toggle("dark", form.theme === "dark");
   }
@@ -120,6 +123,10 @@ export default function SettingsPage() {
           <div>
             <Label>Alerta de stake máxima (% da banca)</Label>
             <Input type="number" step="0.1" value={form.stake_warning_percent} onChange={(e) => setForm({ ...form, stake_warning_percent: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <Label className="mb-1 block">Casa de aposta padrão</Label>
+            <BookmakerSelect value={form.default_bookmaker} onChange={(v) => setForm({ ...form, default_bookmaker: v })} />
           </div>
         </div>
 

@@ -27,3 +27,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Arquivos temporários do Vite (config timestamps)
+vite.config.ts.timestamp-*.mjs
+
+# Visual Studio
+.vs/
+
+# Scripts de manutenção local (não versionar — contêm operações destrutivas/diagnóstico)
+wipe_bets.mjs
+diagnose_duplicates.mjs
+
+# Doc de handoff interno
+HANDOFF.md

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   recomputeBetDerived,
   clvPercent,
@@ -20,7 +21,7 @@ import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
 import { SelectionAutocomplete } from "@/components/bets/SelectionAutocomplete";
 import { MarketAutocomplete } from "@/components/bets/MarketAutocomplete";
-import { LegsEditor, makeEmptyLeg, type EditableLeg } from "@/components/bets/LegsEditor";
+import { LegsEditor, type EditableLeg } from "@/components/bets/LegsEditor";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
 const BET_TYPES = [
@@ -36,19 +37,24 @@ const TIMING = [
 export function BetForm({
   initial,
   initialLegs,
+  prefillLegs,
   bankrollNow,
   onSubmit,
   submitLabel = "Salvar aposta",
 }: {
   initial?: Partial<Bet>;
-  /** Pernas existentes (edição de uma múltipla já salva). */
   initialLegs?: BetLegRow[];
+  /** Pernas pré-preenchidas vindas de apostas simples combinadas em uma múltipla (novo registro apenas). */
+  prefillLegs?: EditableLeg[];
   bankrollNow: number;
-  onSubmit: (data: BetInput) => Promise<void> | void;
+  onSubmit: (data: BetInput, opts: { keepOpen: boolean }) => Promise<void> | void;
   submitLabel?: string;
 }) {
   const { data: profile } = useProfile();
   const currency = profile?.currency ?? "BRL";
+
+  // ✨ QUICK ENTRY STATE
+  const [isEventFixed, setIsEventFixed] = useState(false);
 
   const [betDate, setBetDate] = useState(toISODateInput(initial?.bet_date ?? new Date()));
   const [eventDate, setEventDate] = useState(toISODateInput(initial?.event_date ?? ""));
@@ -57,6 +63,7 @@ export function BetForm({
   const [event_name, setEventName] = useState(initial?.event_name ?? "");
   const [homeTeam, setHomeTeam] = useState<string | undefined>(undefined);
   const [awayTeam, setAwayTeam] = useState<string | undefined>(undefined);
+
   function applyEventPick(p: { name: string; isoDate: string | null; sport: string; league: string; homeTeam?: string; awayTeam?: string }) {
     setEventName(p.name);
     if (p.sport) setSport(p.sport);
@@ -69,15 +76,15 @@ export function BetForm({
     setHomeTeam(p.homeTeam);
     setAwayTeam(p.awayTeam);
   }
+
   const [market, setMarket] = useState(initial?.market ?? "");
   const [selection, setSelection] = useState(initial?.selection ?? "");
   function changeMarket(v: string) {
     setMarket(v);
-    // ao trocar o mercado, libera a Seleção para nova escolha
     setSelection("");
   }
   const [bookmaker, setBookmaker] = useState(initial?.bookmaker ?? "");
-  const [bet_type, setBetType] = useState(initial?.bet_type ?? "simples");
+  const [bet_type, setBetType] = useState(initial?.bet_type ?? (prefillLegs && prefillLegs.length > 0 ? "multipla" : "simples"));
   const [timing, setTiming] = useState(initial?.timing ?? "pre-live");
   const [odds, setOdds] = useState<number>(Number(initial?.odds ?? 0));
   const [closing_odds, setClosingOdds] = useState<number | undefined>(
@@ -113,8 +120,12 @@ export function BetForm({
         tipster: l.tipster ?? "",
       }));
     }
+    if (prefillLegs && prefillLegs.length > 0) {
+      return prefillLegs;
+    }
     return [];
   });
+
   const isMultiple = bet_type === "multipla";
 
   const legsAsBetLeg: BetLeg[] = useMemo(
@@ -158,8 +169,13 @@ export function BetForm({
     if (profile?.unit_value && stake_amount === 0 && !initial) {
       setStake(profile.unit_value);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.unit_value]);
+
+  useEffect(() => {
+    if (profile?.default_bookmaker && !bookmaker && !initial) {
+      setBookmaker(profile.default_bookmaker);
+    }
+  }, [profile?.default_bookmaker]);
 
   function validate(): string | null {
     if (isMultiple) {
@@ -180,7 +196,6 @@ export function BetForm({
     const err = validate();
     if (err) { toast.error(err); return; }
     if (profile && calc.stakeOverBankrollPct > Number(profile.stake_warning_percent)) {
-      // just warn
       toast.warning(`Stake é ${calc.stakeOverBankrollPct.toFixed(1)}% da banca (limite ${profile.stake_warning_percent}%)`);
     }
 
@@ -223,7 +238,27 @@ export function BetForm({
           }))
         : [],
     };
-    await onSubmit(data);
+    const keepOpen = !initial && isEventFixed;
+    await onSubmit(data, { keepOpen });
+
+    if (!initial) {
+      if (isEventFixed) {
+        setMarket("");
+        setSelection("");
+        setOdds(0);
+        setStake(0);
+      } else {
+        setSport("Futebol");
+        setLeague("");
+        setEventName("");
+        setHomeTeam(undefined);
+        setAwayTeam(undefined);
+        setMarket("");
+        setSelection("");
+        setOdds(0);
+        setStake(0);
+      }
+    }
   }
 
   return (
@@ -255,6 +290,7 @@ export function BetForm({
                     <SelectContent>{SPORTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
+
                 <Field label="Evento" className="md:col-span-2">
                   <EventAutocomplete
                     value={event_name}
@@ -263,6 +299,7 @@ export function BetForm({
                     placeholder="Ex: Uruguai (digite p/ buscar partidas)"
                   />
                 </Field>
+
                 <Field label="Mercado">
                   <MarketAutocomplete value={market} onChange={changeMarket} placeholder="Ex: Resultado final" />
                 </Field>
@@ -306,6 +343,22 @@ export function BetForm({
                   </SelectContent>
                 </Select>
               </Field>
+            )}
+            {!isMultiple && (
+              <div className="flex items-center space-x-2 self-end pb-2">
+                <Switch
+                  checked={isEventFixed}
+                  onCheckedChange={setIsEventFixed}
+                  className="data-[state=checked]:bg-blue-500"
+                  id="keep-event-info"
+                />
+                <Label
+                  htmlFor="keep-event-info"
+                  className="text-xs text-muted-foreground cursor-pointer"
+                >
+                  Manter informações do evento
+                </Label>
+              </div>
             )}
           </div>
 
@@ -486,5 +539,5 @@ function Calc({ label, value, tone }: { label: string; value: string; tone?: "po
       <div className="stat-label">{label}</div>
       <div className={`font-mono font-semibold mt-0.5 ${tone === "positive" ? "positive" : tone === "negative" ? "negative" : ""}`}>{value}</div>
     </div>
-  );
+   );
 }

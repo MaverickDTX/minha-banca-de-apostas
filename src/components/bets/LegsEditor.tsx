@@ -48,6 +48,41 @@ export function makeEmptyLeg(): EditableLeg {
   };
 }
 
+/** Converte uma aposta simples já registrada em uma perna editável, para reaproveitá-la em uma múltipla. */
+export function legFromBet(bet: {
+  sport: string | null;
+  league: string | null;
+  event_name: string | null;
+  market: string | null;
+  selection: string | null;
+  odds: number;
+  status: string;
+  tipster: string | null;
+  event_date?: string | null;
+}): EditableLeg {
+  const legStatusMap: Record<string, LegStatus> = {
+    green: "green",
+    red: "red",
+    void: "void",
+    pendente: "pendente",
+    half_green: "green",
+    half_red: "red",
+    cashout: "green",
+  };
+  return {
+    key: crypto.randomUUID(),
+    sport: bet.sport ?? "Futebol",
+    league: bet.league ?? "",
+    event_name: bet.event_name ?? "",
+    event_date: bet.event_date ? toISODateInput(bet.event_date) : "",
+    market: bet.market ?? "",
+    selection: bet.selection ?? "",
+    odds: Number(bet.odds),
+    status: legStatusMap[bet.status] ?? "pendente",
+    tipster: bet.tipster ?? "",
+  };
+}
+
 export function LegsEditor({
   legs,
   onChange,
@@ -186,4 +221,3 @@ function LegField({ label, children, className }: { label: string; children: Rea
     </div>
   );
 }
-

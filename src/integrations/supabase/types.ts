@@ -224,6 +224,7 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          default_bookmaker: string | null
           display_name: string | null
           email: string | null
           id: string
@@ -239,6 +240,7 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string
+          default_bookmaker?: string | null
           display_name?: string | null
           email?: string | null
           id: string
@@ -254,6 +256,7 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          default_bookmaker?: string | null
           display_name?: string | null
           email?: string | null
           id?: string
@@ -398,7 +401,7 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    ? DefaultSchema["CompositeTypes"][CompositeTypeName]
     : never
 
 export const Constants = {

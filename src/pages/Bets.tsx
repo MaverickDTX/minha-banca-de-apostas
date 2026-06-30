@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useBets, useDeleteBet, useUpdateBet, useBulkUpdateBets, type Bet, type BetInput } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3, ChevronLeft, ChevronRight } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { STATUS_COLORS, STATUS_LABELS, computeNetProfit, computeGrossReturn, type BetStatus } from "@/lib/calc";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
 import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
 import { BetCard } from "@/components/bets/BetCard";
+import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function Bets() {
   useEffect(() => { document.title = "Apostas · Bankroll Pro"; }, []);
+  const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: bets = [], isLoading } = useBets();
   const { data: profile } = useProfile();
@@ -54,6 +56,19 @@ export default function Bets() {
     }
   }
 
+  const selectedSimpleBets = useMemo(
+    () => selectedIds
+      .map((id) => bets.find((b) => b.id === id))
+      .filter((b): b is Bet => !!b && b.bet_type !== "multipla"),
+    [selectedIds, bets],
+  );
+  const canCombineIntoMultiple = selectedSimpleBets.length >= 2 && selectedSimpleBets.length === selectedIds.length;
+
+  function handleCombineIntoMultiple() {
+    const legs = selectedSimpleBets.map((b) => legFromBet(b));
+    nav("/nova-aposta", { state: { legsFromBets: legs } });
+  }
+
   async function handleBulkDelete() {
     try {
       await Promise.all(selectedIds.map(id => deleteBet.mutateAsync(id)));
@@ -74,7 +89,7 @@ export default function Bets() {
   const betType = searchParams.get("type") || "all";
   const dateStart = searchParams.get("start") || "";
   const dateEnd = searchParams.get("end") || "";
-  
+
   // Pagination from URL
   const page = Number(searchParams.get("page") || "1");
   const pageSize = Number(searchParams.get("size") || "20");
@@ -89,6 +104,11 @@ export default function Bets() {
     params.set("page", "1"); // Reset to first page on filter change
     setSearchParams(params);
     setSelectedIds([]); // Clear selection on filter change
+  };
+
+  const handleClearFilters = () => {
+    setSearchParams({}); // Isso remove todos os parâmetros da URL de uma vez
+    setSelectedIds([]);  // Limpa as seleções da tabela
   };
 
   const sports = useMemo(() => Array.from(new Set(bets.map((b) => b.sport).filter(Boolean) as string[])), [bets]);
@@ -199,6 +219,17 @@ export default function Bets() {
             <SelectItem value="100">100 por pág.</SelectItem>
           </SelectContent>
         </Select>
+          {(q || status !== "all" || sport !== "all" || bookmaker !== "all" || betType !== "all" || dateStart || dateEnd) && (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClearFilters}
+      className="text-muted-foreground hover:text-destructive transition-colors"
+    >
+      <RotateCcw className="h-4 w-4 mr-2" />
+      Limpar Filtros
+    </Button>
+  )}
         <div className="ml-auto text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">{totals.count}</span> apostas ·
           Stake <span className="font-mono">{formatCurrency(totals.stake, currency)}</span> ·
@@ -414,6 +445,12 @@ export default function Bets() {
             {selectedIds.length} selecionada{selectedIds.length > 1 ? "s" : ""}
           </span>
           <div className="flex items-center gap-1 border-l border-border pl-4">
+            {canCombineIntoMultiple && (
+              <Button size="sm" variant="ghost" className="h-8 text-primary hover:bg-primary/15 hover:text-primary" onClick={handleCombineIntoMultiple}>
+                <Layers className="h-4 w-4 mr-1.5" />
+                Combinar em múltipla
+              </Button>
+            )}
             <Button size="sm" variant="ghost" className="h-8 text-success hover:bg-success/15 hover:text-success" onClick={() => handleBulkStatus("green")}>
               Ganha
             </Button>

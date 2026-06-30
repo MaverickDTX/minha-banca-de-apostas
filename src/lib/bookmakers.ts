@@ -7,7 +7,7 @@ export type BookmakerDef = {
   bg: string;
   /** Foreground (text) color on the tile */
   fg: string;
-  /** Official domain used to fetch a real brand logo (Clearbit). */
+  /** Official domain (kept for reference / fallback only). */
   domain?: string;
 };
 
@@ -23,8 +23,8 @@ export const BOOKMAKERS: BookmakerDef[] = [
   { slug: "blaze",          name: "Blaze",           monogram: "BZ",   bg: "20 96% 55%",  fg: "0 0% 8%",      domain: "blaze.com" },
   { slug: "novibet",        name: "Novibet",         monogram: "NV",   bg: "210 90% 48%", fg: "0 0% 100%",    domain: "novibet.com" },
   { slug: "betnacional",    name: "BetNacional",     monogram: "BN",   bg: "138 70% 36%", fg: "0 0% 100%",    domain: "betnacional.com" },
-  { slug: "bwin",           name: "Bwin",            monogram: "BW",   bg: "48 100% 50%", fg: "0 0% 8%",      domain: "bwin.com" },
-  { slug: "888sport",       name: "888sport",        monogram: "888",  bg: "18 94% 52%",  fg: "0 0% 100%",    domain: "888sport.com" },
+  { slug: "betwarrior",     name: "BetWarrior",      monogram: "BW",   bg: "0 84% 48%",   fg: "0 0% 100%",    domain: "betwarrior.bet.br" },
+  { slug: "betsson",        name: "Betsson",         monogram: "BS",   bg: "28 100% 50%", fg: "0 0% 100%",    domain: "betsson.bet.br" },
   { slug: "stake",          name: "Stake",           monogram: "ST",   bg: "210 14% 16%", fg: "144 96% 58%",  domain: "stake.com" },
   { slug: "galera",         name: "Galera.bet",      monogram: "GL",   bg: "262 70% 50%", fg: "0 0% 100%",    domain: "galera.bet" },
   { slug: "esportesdasorte",name: "Esportes da Sorte", monogram: "ES", bg: "48 96% 52%",  fg: "0 0% 8%",      domain: "esportesdasorte.bet.br" },
@@ -56,9 +56,4 @@ export function fallbackTile(name: string): { bg: string; fg: string; monogram: 
   for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) >>> 0;
   const hue = hash % 360;
   return { bg: `${hue} 60% 38%`, fg: "0 0% 100%", monogram: mono };
-}
-
-/** Public Clearbit logo URL for a given domain. No API key required. */
-export function logoUrl(domain: string, size = 128): string {
-  return `https://logo.clearbit.com/${domain}?size=${size}`;
 }

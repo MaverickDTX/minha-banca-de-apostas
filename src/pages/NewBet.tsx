@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { BetForm } from "@/components/bets/BetForm";
+import type { EditableLeg } from "@/components/bets/LegsEditor";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useBet, useBetLegs, useCreateBet, useUpdateBet, useBets } from "@/hooks/useBets";
@@ -14,6 +15,10 @@ export default function NewBet() {
   const editing = !!id;
   useEffect(() => { document.title = `${editing ? "Editar" : "Nova"} aposta · Bankroll Pro`; }, [editing]);
   const nav = useNavigate();
+  const location = useLocation();
+  const prefillLegs = !editing
+    ? ((location.state as { legsFromBets?: EditableLeg[] } | null)?.legsFromBets ?? undefined)
+    : undefined;
   const create = useCreateBet();
   const update = useUpdateBet();
   const { data: bet } = useBet(id);
@@ -34,28 +39,32 @@ export default function NewBet() {
           <h1 className="text-2xl font-semibold tracking-tight">{editing ? "Editar aposta" : "Nova aposta"}</h1>
           <p className="text-sm text-muted-foreground">Preencha os campos. Os cálculos são automáticos.</p>
         </div>
-        {!editing && (
-          <Button type="button" variant="outline" size="sm" onClick={() => nav(-1)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Cancelar
-          </Button>
-        )}
+        <Button type="button" variant="outline" size="sm" onClick={() => nav(-1)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
       </div>
       <div className="surface p-4 md:p-6">
         <BetForm
           initial={bet ?? undefined}
           initialLegs={betLegs}
+          prefillLegs={prefillLegs}
           bankrollNow={bank.current}
           submitLabel={editing ? "Atualizar aposta" : "Salvar aposta"}
-          onSubmit={async (data) => {
+          onSubmit={async (data, { keepOpen }) => {
             if (editing && bet) {
               await update.mutateAsync({ id: bet.id, patch: data });
               toast.success("Aposta atualizada");
-            } else {
-              await create.mutateAsync(data);
-              toast.success("Aposta registrada");
+              nav({ pathname: "/apostas", search: window.location.search });
+              return;
             }
-            nav({ pathname: "/apostas", search: window.location.search });
+            await create.mutateAsync(data);
+            if (keepOpen) {
+              toast.success("Aposta registrada. Evento fixado para a próxima.");
+            } else {
+              toast.success("Aposta registrada");
+              nav({ pathname: "/apostas", search: window.location.search });
+            }
           }}
         />
       </div>

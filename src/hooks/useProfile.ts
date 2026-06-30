@@ -14,6 +14,7 @@ export type Profile = {
   kelly_fraction: number;
   stake_warning_percent: number;
   theme: string;
+  default_bookmaker: string | null;
 };
 
 export function useProfile() {
