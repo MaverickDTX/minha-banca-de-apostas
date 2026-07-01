@@ -7,7 +7,7 @@ import { StatCard } from "@/components/StatCard";
 import { computeBankroll, computeMetrics, groupBy } from "@/lib/metrics";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 
@@ -111,19 +111,19 @@ export default function Dashboard() {
         <StatCard label="Lucro / prejuízo" value={formatCurrency(metrics.netProfit, currency)} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} />
         <StatCard label="ROI" value={formatPercent(roi)} icon={Target} hint="sobre banca inicial" tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} />
         <StatCard label="Yield" value={formatPercent(metrics.yield)} icon={Activity} tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} />
-        <StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} />
-        <StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} />
-        <StatCard label="Taxa de acerto" value={formatPercent(metrics.hitRate, 1)} />
-        <StatCard label="Odd média" value={formatNumber(metrics.avgOdds, 2)} />
-        <StatCard label="Stake média" value={formatCurrency(metrics.avgStake, currency)} />
-        <StatCard label="Maior drawdown" value={formatCurrency(metrics.maxDrawdown, currency)} tone="negative" />
+        <StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} icon={Banknote} />
+        <StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} icon={ListChecks} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} />
+        <StatCard label="Taxa de acerto" value={formatPercent(metrics.hitRate, 1)} icon={Percent} />
+        <StatCard label="Odd média" value={formatNumber(metrics.avgOdds, 2)} icon={Dices} />
+        <StatCard label="Stake média" value={formatCurrency(metrics.avgStake, currency)} icon={Coins} />
+        <StatCard label="Maior drawdown" value={formatCurrency(metrics.maxDrawdown, currency)} icon={TrendingDown} tone="negative" />
         <StatCard
           label="Sequência atual"
           value={metrics.currentStreak.type === "none" ? "—" : `${metrics.currentStreak.count} ${metrics.currentStreak.type === "green" ? "ganhas" : "perdidas"}`}
           icon={Flame}
           tone={metrics.currentStreak.type === "green" ? "positive" : metrics.currentStreak.type === "red" ? "negative" : "neutral"}
         />
-        <StatCard label="Resultado do mês" value={formatCurrency(monthProfit, currency)} tone={monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "neutral"} />
+        <StatCard label="Resultado do mês" value={formatCurrency(monthProfit, currency)} icon={CalendarDays} tone={monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "neutral"} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
