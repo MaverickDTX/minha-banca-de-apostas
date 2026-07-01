@@ -4,7 +4,7 @@
 const KEY = "3";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 
-import { translateEventName, translateLeague, translateTeamName } from "@/lib/translate";
+import { translateEventName, translateLeague, translateTeamName, translateQueryToEnglish } from "@/lib/translate";
 import { searchEventsApiSports } from "@/lib/apisports";
 
 export type SportEvent = {
@@ -82,11 +82,15 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
   const cached = sportCache.get(q.toLowerCase());
   if (cached) return cached;
 
+  // PT → EN: as APIs indexam nomes em inglês ("Alemanha" não acha "Germany").
+  // Cache continua chaveado pela query original digitada.
+  const searchQ = translateQueryToEnglish(q) ?? q;
+
   const results = new Map<string, SportEvent>();
 
   // 1) Direct event-name search.
   try {
-    const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(q)}`, { signal });
+    const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(searchQ)}`, { signal });
     if (res.ok) {
       const json = await res.json();
       const arr: RawEvent[] = Array.isArray(json?.event) ? json.event : [];
@@ -102,7 +106,7 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
   //    bets logged after the fact can still be autocompleted.
   //    Limited to 1 team to stay within TheSportsDB free tier (30 req/min).
   try {
-    const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(q)}`, { signal });
+    const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(searchQ)}`, { signal });
     if (res.ok) {
       const json = await res.json();
       const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 1) : [];
@@ -148,7 +152,7 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
   // Fallback: if TheSportsDB returned nothing, try API-Sports (football only).
   if (list.length === 0) {
     try {
-      const fallback = await searchEventsApiSports(q, signal);
+      const fallback = await searchEventsApiSports(searchQ, signal);
       list = fallback.slice(0, 15);
     } catch { /* ignore */ }
   }

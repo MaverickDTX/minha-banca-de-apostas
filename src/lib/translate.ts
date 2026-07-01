@@ -82,3 +82,49 @@ export function translateLeague(league: string): string {
 export function translateTeamName(name?: string): string | undefined {
   return name ? translateTeam(name) : undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Tradução reversa (PT → EN) da *query* de busca.
+// As APIs (TheSportsDB, API-Sports) indexam nomes em inglês; sem isso,
+// digitar "Alemanha" não encontra "Germany".
+
+const normalizeQuery = (s: string) =>
+  s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+
+let PT_TO_EN: Map<string, string> | null = null;
+
+function ptIndex(): Map<string, string> {
+  if (!PT_TO_EN) {
+    PT_TO_EN = new Map();
+    for (const [en, pt] of Object.entries(TEAMS)) {
+      const k = normalizeQuery(pt);
+      // Primeiro EN vence em colisões (ex.: "China PR" e "China" → "China").
+      if (!PT_TO_EN.has(k)) PT_TO_EN.set(k, en);
+    }
+  }
+  return PT_TO_EN;
+}
+
+/**
+ * Traduz a query do usuário (PT) para o nome em inglês usado pelas APIs.
+ * Insensível a acentos e caixa. Match exato sempre; match por prefixo
+ * (query ≥ 3 chars) apenas quando não-ambíguo ("alem" → "Germany", mas
+ * "irl" → null, pois casa "Irlanda" e "Irlanda do Norte").
+ * Retorna null quando não há tradução aplicável — o chamador usa a query original.
+ */
+export function translateQueryToEnglish(query: string): string | null {
+  const q = normalizeQuery(query);
+  if (q.length < 2) return null;
+  const idx = ptIndex();
+  const exact = idx.get(q);
+  if (exact) return exact;
+  if (q.length < 3) return null;
+  let hit: string | null = null;
+  for (const [pt, en] of idx) {
+    if (pt.startsWith(q)) {
+      if (hit !== null && hit !== en) return null; // prefixo ambíguo
+      hit = en;
+    }
+  }
+  return hit;
+}
