@@ -309,7 +309,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      bulk_settle_bets: {
+        Args: { p_updates: Json }
+        Returns: number
+      }
+      create_bets_with_legs: {
+        Args: { p_bets: Json }
+        Returns: string[]
+      }
+      replace_bet_legs: {
+        Args: { p_bet_id: string; p_legs: Json }
+        Returns: undefined
+      }
+      update_bet_with_legs: {
+        Args: { p_bet_id: string; p_fields?: Json; p_legs?: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "./useAuth";
 import type { BetStatus, LegStatus } from "@/lib/calc";
 
@@ -152,29 +153,10 @@ export function useBetLegs(betId: string | undefined) {
   });
 }
 
-/** Substitui integralmente as pernas de uma aposta (delete-all + insert). */
-async function replaceBetLegs(betId: string, legs: BetLegInput[]) {
-  const { error: delErr } = await supabase.from("bet_legs").delete().eq("bet_id", betId);
-  if (delErr) throw delErr;
-  if (legs.length === 0) return;
-  const rows = legs.map((l, idx) => ({
-    bet_id: betId,
-    order_index: l.order_index ?? idx,
-    sport: l.sport ?? null,
-    league: l.league ?? null,
-    event_name: l.event_name ?? null,
-    home_team: l.home_team ?? null,
-    away_team: l.away_team ?? null,
-    event_date: l.event_date ?? null,
-    market: l.market ?? null,
-    selection: l.selection ?? null,
-    odds: l.odds,
-    status: l.status,
-    tipster: l.tipster ?? null,
-  }));
-  const { error: insErr } = await supabase.from("bet_legs").insert(rows);
-  if (insErr) throw insErr;
-}
+// Escritas compostas (bets + bet_legs) passam por RPCs transacionais no Postgres
+// (migration atomic_bet_write_rpcs). Falha parcial reverte a transação inteira.
+// As funções são SECURITY INVOKER: a RLS continua valendo, e cada uma revalida
+// a posse via auth.uid().
 
 export function useBulkCreateBets() {
   const { user } = useAuth();
@@ -182,48 +164,11 @@ export function useBulkCreateBets() {
   return useMutation({
     mutationFn: async (inputs: BetInput[]) => {
       if (!user) throw new Error("User not authenticated");
-      
-      const rows = inputs.map((input) => {
-        const { legs, ...fields } = input;
-        return { ...fields, user_id: user.id };
+      const { data, error } = await supabase.rpc("create_bets_with_legs", {
+        p_bets: inputs as unknown as Json,
       });
-
-      // Inserir as bets e retornar os IDs gerados
-      const { data, error } = await supabase.from("bets").insert(rows).select("id");
       if (error) throw error;
-
-      const insertedBets = data || [];
-      const legsToInsert: any[] = [];
-
-      insertedBets.forEach((bet, i) => {
-        const input = inputs[i];
-        if (input.legs && input.legs.length > 0) {
-          input.legs.forEach((l, idx) => {
-            legsToInsert.push({
-              bet_id: bet.id,
-              order_index: l.order_index ?? idx,
-              sport: l.sport ?? null,
-              league: l.league ?? null,
-              event_name: l.event_name ?? null,
-              home_team: l.home_team ?? null,
-              away_team: l.away_team ?? null,
-              event_date: l.event_date ?? null,
-              market: l.market ?? null,
-              selection: l.selection ?? null,
-              odds: l.odds,
-              status: l.status,
-              tipster: l.tipster ?? null,
-            });
-          });
-        }
-      });
-
-      if (legsToInsert.length > 0) {
-        const { error: legsErr } = await supabase.from("bet_legs").insert(legsToInsert);
-        if (legsErr) throw legsErr;
-      }
-
-      return rows.length;
+      return data?.length ?? 0;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
@@ -231,38 +176,29 @@ export function useBulkCreateBets() {
   });
 }
 
+/**
+ * Liquidação em lote. O payload é fixo (status, net_profit, gross_return);
+ * a RPC também propaga o status às pernas de múltiplas, tudo numa transação —
+ * qualquer id inválido reverte o lote inteiro.
+ */
 export function useBulkUpdateBets() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (updates: { id: string; bet_type: string; patch: Partial<BetInput> }[]) => {
       if (!user) throw new Error("User not authenticated");
-      
-      const promises = updates.map(async ({ id, bet_type, patch }) => {
-        const { error } = await supabase.from("bets").update(patch).eq("id", id).eq("user_id", user.id);
-        if (error) throw error;
-        
-        if (bet_type === "multipla" && patch.status) {
-          const statusMap: Record<string, string> = {
-            green: "green",
-            red: "red",
-            void: "void",
-            pendente: "pendente",
-            half_green: "green",
-            half_red: "red",
-            cashout: "green",
-          };
-          const legStatus = statusMap[patch.status] || "pendente";
-          const { error: legErr } = await supabase
-            .from("bet_legs")
-            .update({ status: legStatus })
-            .eq("bet_id", id);
-          if (legErr) throw legErr;
-        }
+      const payload = updates.map(({ id, bet_type, patch }) => ({
+        id,
+        bet_type,
+        status: patch.status,
+        net_profit: patch.net_profit ?? null,
+        gross_return: patch.gross_return ?? null,
+      }));
+      const { data, error } = await supabase.rpc("bulk_settle_bets", {
+        p_updates: payload as unknown as Json,
       });
-
-      await Promise.all(promises);
-      return updates.length;
+      if (error) throw error;
+      return data ?? 0;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
@@ -274,23 +210,19 @@ export function useCreateBet() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: BetInput) => {
-      const { legs, ...betFields } = input;
-      const { error, data } = await supabase
-        .from("bets")
-        .insert({ ...betFields, user_id: user!.id })
-        .select()
-        .single();
+    mutationFn: async (input: BetInput): Promise<string> => {
+      if (!user) throw new Error("User not authenticated");
+      const { data, error } = await supabase.rpc("create_bets_with_legs", {
+        p_bets: [input] as unknown as Json,
+      });
       if (error) throw error;
-      const bet = data as Bet;
-      if (legs && legs.length > 0) {
-        await replaceBetLegs(bet.id, legs);
-      }
-      return bet;
+      const id = data?.[0];
+      if (!id) throw new Error("Falha ao criar aposta");
+      return id;
     },
-    onSuccess: (bet) => {
+    onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
-      qc.invalidateQueries({ queryKey: ["bet_legs", bet.id] });
+      qc.invalidateQueries({ queryKey: ["bet_legs", id] });
     },
   });
 }
@@ -301,13 +233,13 @@ export function useUpdateBet() {
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<BetInput> }) => {
       const { legs, ...betFields } = patch;
-      if (Object.keys(betFields).length > 0) {
-        const { error } = await supabase.from("bets").update(betFields).eq("id", id);
-        if (error) throw error;
-      }
-      if (legs != null) {
-        await replaceBetLegs(id, legs);
-      }
+      const { error } = await supabase.rpc("update_bet_with_legs", {
+        p_bet_id: id,
+        p_fields: betFields as unknown as Json,
+        // p_legs omitido/null = não mexe nas pernas; array = substituição integral.
+        p_legs: legs != null ? (legs as unknown as Json) : undefined,
+      });
+      if (error) throw error;
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
@@ -322,7 +254,9 @@ export function useDeleteBet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("bets").delete().eq("id", id);
+      if (!user) throw new Error("User not authenticated");
+      // #21: filtro por user_id além da RLS (defense in depth).
+      const { error } = await supabase.from("bets").delete().eq("id", id).eq("user_id", user.id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["bets", user?.id] }),

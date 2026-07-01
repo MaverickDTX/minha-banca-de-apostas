@@ -54,8 +54,9 @@ export default function Bets() {
         bet_type: b.bet_type,
         patch: {
           status: newStatus,
-          net_profit: computeNetProfit(newStatus, stake, odds),
-          gross_return: computeGrossReturn(newStatus, stake, odds),
+          // is_free_bet: perder freebet não custa nada (SNR) — sem isso o lote calculava -stake.
+          net_profit: computeNetProfit(newStatus, stake, odds, null, b.is_free_bet),
+          gross_return: computeGrossReturn(newStatus, stake, odds, null, b.is_free_bet),
         }
       };
     }).filter(Boolean) as { id: string; bet_type: string; patch: Partial<BetInput> }[];
