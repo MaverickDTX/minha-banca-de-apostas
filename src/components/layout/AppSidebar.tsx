@@ -51,7 +51,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-semibold text-sidebar-foreground">Bankroll Pro</span>
-            <span className="text-[11px] text-muted-foreground">Gestão de apostas</span>
+            <span className="text-[11px] text-muted-foreground">Minha Banca de Apostas</span>
           </div>
         </div>
       </SidebarHeader>
@@ -95,5 +95,4 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
-  );
-}
+  
