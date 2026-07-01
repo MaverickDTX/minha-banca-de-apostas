@@ -173,7 +173,7 @@ export function LegsEditor({
             <LegField label="Mercado">
               <MarketAutocomplete
                 value={leg.market}
-                onChange={(v) => update(idx, { market: v, selection: "" })}
+                onChange={(v) => update(idx, { market: v })}
                 sport={leg.sport}
               />
             </LegField>

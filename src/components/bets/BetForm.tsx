@@ -81,7 +81,7 @@ export function BetForm({
   const [selection, setSelection] = useState(initial?.selection ?? "");
   function changeMarket(v: string) {
     setMarket(v);
-    setSelection("");
+    // Mantém a seleção já preenchida ao trocar o mercado (útil ao editar).
   }
   const [bookmaker, setBookmaker] = useState(initial?.bookmaker ?? "");
   const [bet_type, setBetType] = useState(initial?.bet_type ?? (prefillLegs && prefillLegs.length > 0 ? "multipla" : "simples"));
