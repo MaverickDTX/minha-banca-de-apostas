@@ -444,7 +444,7 @@ export default function Bets() {
                   <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
                 </TableCell>
                 <TableCell className={`text-right font-mono ${Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : ""}`}>
-                  {b.net_profit != null ? formatCurrency(Number(b.net_profit), currency) : "—"}
+                  {b.status !== "pendente" && b.net_profit != null ? formatCurrency(Number(b.net_profit), currency) : "—"}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>

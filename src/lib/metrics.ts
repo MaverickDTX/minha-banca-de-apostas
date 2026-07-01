@@ -20,6 +20,9 @@ export type Metrics = {
   worstRed: number;
   avgClv: number;
   avgEv: number;
+  /** Nº de apostas com CLV/EV registrado — 0 permite à UI exibir "—" em vez de 0,00. */
+  clvCount: number;
+  evCount: number;
 };
 
 export function computeMetrics(bets: Bet[]): Metrics {
@@ -91,6 +94,8 @@ export function computeMetrics(bets: Bet[]): Metrics {
     worstRed,
     avgClv,
     avgEv,
+    clvCount: clvBets.length,
+    evCount: evBets.length,
   };
 }
 

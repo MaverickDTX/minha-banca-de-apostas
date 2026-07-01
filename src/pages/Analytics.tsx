@@ -39,10 +39,11 @@ export default function Analytics() {
   const grouping = (rows: { key: string; bets: typeof bets; metrics: ReturnType<typeof computeMetrics> }[]) =>
     rows.sort((a, b) => b.metrics.netProfit - a.metrics.netProfit);
 
-  const bySport = grouping(groupBy(settled, (b) => b.sport ?? "—"));
-  const byLeague = grouping(groupBy(settled, (b) => b.league ?? "—"));
-  const byMarket = grouping(groupBy(settled, (b) => b.market ?? "—"));
-  const byBook = grouping(groupBy(settled, (b) => b.bookmaker ?? "—"));
+  // `||` em vez de `??`: string vazia também deve cair no agrupador "—".
+  const bySport = grouping(groupBy(settled, (b) => (b.sport && b.sport.trim()) || "—"));
+  const byLeague = grouping(groupBy(settled, (b) => (b.league && b.league.trim()) || "—"));
+  const byMarket = grouping(groupBy(settled, (b) => (b.market && b.market.trim()) || "—"));
+  const byBook = grouping(groupBy(settled, (b) => (b.bookmaker && b.bookmaker.trim()) || "—"));
   const byOdds = grouping(groupBy(settled, (b) => oddsBucket(Number(b.odds))));
   const byDay = grouping(groupBy(settled, (b) => DAY_NAMES[new Date(b.bet_date).getDay()]));
   const byMonth = grouping(groupBy(settled, (b) => {
@@ -58,17 +59,20 @@ export default function Analytics() {
   const cumChart = useMemo(() => {
     const ordered = settled.slice().sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
     let cum = 0; let peak = 0;
-    return ordered.map((b, i) => {
+    // t = timestamp para eixo temporal real (antes o eixo exibia índices crus).
+    return ordered.map((b) => {
       cum += Number(b.net_profit || 0);
       peak = Math.max(peak, cum);
-      return { i: i + 1, lucro: cum, drawdown: cum - peak };
+      return { t: new Date(b.bet_date).getTime(), lucro: cum, drawdown: cum - peak };
     });
   }, [settled]);
 
   const oddsHist = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of settled) m.set(oddsBucket(Number(b.odds)), (m.get(oddsBucket(Number(b.odds))) ?? 0) + 1);
-    return Array.from(m.entries()).map(([k, v]) => ({ faixa: k, n: v }));
+    // Ordem fixa das faixas — histograma pede eixo ordinal, não ordenado por contagem.
+    const ORDER = ["1.01–1.49", "1.50–1.79", "1.80–2.09", "2.10–2.99", "3.00+"];
+    return ORDER.map((k) => ({ faixa: k, n: m.get(k) ?? 0 }));
   }, [settled]);
 
   const scatter = useMemo(() => settled.map((b) => ({ stake: Number(b.stake_amount), lucro: Number(b.net_profit || 0) })), [settled]);
@@ -102,9 +106,21 @@ export default function Analytics() {
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={cumChart}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-              <XAxis dataKey="i" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <XAxis
+                dataKey="t"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={11}
+              />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                formatter={(v: number) => formatCurrency(v, currency)}
+                labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
+              />
               <Line type="monotone" dataKey="lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="drawdown" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} />
             </LineChart>
@@ -200,8 +216,8 @@ function GroupTable({ rows, currency }: { rows: { key: string; metrics: ReturnTy
               <TableCell className="text-right font-mono">{formatPercent(r.metrics.hitRate, 1)}</TableCell>
               <TableCell className="text-right font-mono">{formatNumber(r.metrics.avgOdds, 2)}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(r.metrics.avgStake, currency)}</TableCell>
-              <TableCell className="text-right font-mono">{formatPercent(r.metrics.avgClv)}</TableCell>
-              <TableCell className="text-right font-mono">{formatCurrency(r.metrics.avgEv, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{r.metrics.clvCount > 0 ? formatPercent(r.metrics.avgClv) : "—"}</TableCell>
+              <TableCell className="text-right font-mono">{r.metrics.evCount > 0 ? formatCurrency(r.metrics.avgEv, currency) : "—"}</TableCell>
               <TableCell className="text-right font-mono positive">{formatCurrency(r.metrics.bestGreen, currency)}</TableCell>
               <TableCell className="text-right font-mono negative">{formatCurrency(r.metrics.worstRed, currency)}</TableCell>
             </TableRow>

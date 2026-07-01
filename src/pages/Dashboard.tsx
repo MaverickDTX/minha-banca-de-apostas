@@ -30,12 +30,14 @@ export default function Dashboard() {
       .slice()
       .sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
     let cum = Number(profile?.initial_bankroll ?? 0);
+    // Eixo numérico (timestamp): mantém a proporção temporal real — períodos sem
+    // apostas aparecem como planície, não colados (antes o eixo era categórico).
     const points = settled.map((b) => {
       cum += Number(b.net_profit || 0);
-      return { date: new Date(b.bet_date).toLocaleDateString("pt-BR"), banca: cum };
+      return { t: new Date(b.bet_date).getTime(), banca: cum };
     });
     if (points.length === 0) {
-      points.push({ date: "início", banca: Number(profile?.initial_bankroll ?? 0) });
+      points.push({ t: Date.now(), banca: Number(profile?.initial_bankroll ?? 0) });
     }
     return points;
   }, [bets, profile]);
@@ -48,7 +50,17 @@ export default function Dashboard() {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       m.set(key, (m.get(key) ?? 0) + Number(b.net_profit || 0));
     }
-    return Array.from(m.entries()).sort().map(([k, v]) => ({ month: k, profit: v }));
+    const keys = Array.from(m.keys()).sort();
+    if (keys.length === 0) return [];
+    // Preenche meses sem apostas com 0 — sem isso o eixo colava 2024-01 em 2026-06.
+    const out: { month: string; profit: number }[] = [];
+    const [fy, fm] = keys[0].split("-").map(Number);
+    const [ly, lm] = keys[keys.length - 1].split("-").map(Number);
+    for (let y = fy, mo = fm; y < ly || (y === ly && mo <= lm); mo === 12 ? (y++, mo = 1) : mo++) {
+      const key = `${y}-${String(mo).padStart(2, "0")}`;
+      out.push({ month: key, profit: m.get(key) ?? 0 });
+    }
+    return out;
   }, [bets]);
 
   const statusBreak = useMemo(() => {
@@ -58,7 +70,8 @@ export default function Dashboard() {
   }, [bets]);
 
   const bySport = useMemo(
-    () => groupBy(bets.filter((b) => isSettled(b.status)), (b) => b.sport ?? "—").map((g) => ({ name: g.key, lucro: g.metrics.netProfit })),
+    // `|| "Outro"` (não `??`): esporte com string vazia gerava barra fantasma sem rótulo.
+    () => groupBy(bets.filter((b) => isSettled(b.status)), (b) => (b.sport && b.sport.trim()) || "Outro").map((g) => ({ name: g.key, lucro: g.metrics.netProfit })),
     [bets],
   );
 
@@ -124,9 +137,21 @@ export default function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <XAxis
+                dataKey="t"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={11}
+              />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                formatter={(v: number) => formatCurrency(v, currency)}
+                labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
+              />
               <Area type="monotone" dataKey="banca" stroke="hsl(var(--primary))" fill="url(#bk)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -171,7 +196,7 @@ export default function Dashboard() {
             <BarChart data={bySport} layout="vertical">
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} width={70} />
+              <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={95} />
               <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
               <Bar dataKey="lucro" radius={[0,4,4,0]}>
                 {bySport.map((d, i) => <Cell key={i} fill={d.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />)}

@@ -67,10 +67,12 @@ export default function BankrollPage() {
     }
     events.sort((a, b) => a.date - b.date);
     let cum = Number(profile?.initial_bankroll ?? 0);
-    const pts = [{ date: "início", banca: cum }];
+    // Eixo numérico (timestamp) — ponto inicial 1 dia antes do primeiro evento.
+    const t0 = events.length > 0 ? events[0].date - 86400000 : Date.now();
+    const pts = [{ t: t0, banca: cum }];
     for (const e of events) {
       cum += e.delta;
-      pts.push({ date: new Date(e.date).toLocaleDateString("pt-BR"), banca: cum });
+      pts.push({ t: e.date, banca: cum });
     }
     return pts;
   }, [txs, bets, profile]);
@@ -134,9 +136,21 @@ export default function BankrollPage() {
               </linearGradient>
             </defs>
             <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <XAxis
+              dataKey="t"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={11}
+            />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-            <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
+            <Tooltip
+              contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+              formatter={(v: number) => formatCurrency(v, currency)}
+              labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
+            />
             <Area type="monotone" dataKey="banca" stroke="hsl(var(--accent))" fill="url(#bk2)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>

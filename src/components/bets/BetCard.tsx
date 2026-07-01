@@ -69,7 +69,8 @@ export function BetCard({
   const units =
     bet.stake_units ??
     (unitValue && unitValue > 0 ? Number(bet.stake_amount) / unitValue : null);
-  const net = bet.net_profit != null ? Number(bet.net_profit) : null;
+  // Pendente não tem resultado — exibir "—" em vez de R$ 0,00 (zero = break-even).
+  const net = bet.status !== "pendente" && bet.net_profit != null ? Number(bet.net_profit) : null;
   const isMultiple = bet.bet_type === "multipla";
   const [expanded, setExpanded] = useState(false);
   const { data: legs = [] } = useBetLegs(isMultiple ? bet.id : undefined);

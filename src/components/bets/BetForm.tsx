@@ -527,8 +527,9 @@ export function BetForm({
 
       <div className="surface p-4 grid md:grid-cols-4 gap-3 text-sm">
         <Calc label="Prob. implícita" value={formatPercent(calc.implied)} />
-        <Calc label="Retorno potencial" value={formatCurrency(calc.potentialReturn, currency)} />
-        <Calc label="Lucro potencial" value={formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency)} />
+        {/* Sem odd válida não há retorno/lucro a projetar — "—" evita o falso "-R$ 10,00". */}
+        <Calc label="Retorno potencial" value={calc.effectiveOdds > 1 ? formatCurrency(calc.potentialReturn, currency) : "—"} />
+        <Calc label="Lucro potencial" value={calc.effectiveOdds > 1 ? formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency) : "—"} />
         <Calc label="Stake / banca" value={formatPercent(calc.stakeOverBankrollPct)} tone={calc.stakeOverBankrollPct > (profile?.stake_warning_percent ?? 5) ? "negative" : "neutral"} />
         {calc.edge != null && <Calc label="Edge" value={formatPercent(calc.edge)} tone={calc.edge > 0 ? "positive" : "negative"} />}
         {calc.ev != null && <Calc label="EV" value={formatCurrency(calc.ev, currency)} tone={calc.ev > 0 ? "positive" : "negative"} />}
