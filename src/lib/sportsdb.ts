@@ -58,17 +58,42 @@ function normalize(e: RawEvent): SportEvent {
 
 const sportCache = new Map<string, SportEvent[]>();
 
-/** Map TheSportsDB sport string to the in-app sport label. */
+/** Map TheSportsDB/API-Sports sport string to the in-app sport label (PT-BR). */
+const SPORT_LABELS: Record<string, string> = {
+  soccer: "Futebol",
+  football: "Futebol",
+  basketball: "Basquete",
+  tennis: "Tênis",
+  mma: "MMA",
+  fighting: "MMA",
+  "mixed martial arts": "MMA",
+  boxing: "Boxe",
+  esports: "eSports",
+  "american football": "Futebol Americano",
+  nfl: "Futebol Americano",
+  volleyball: "Vôlei",
+  handball: "Handebol",
+  "ice hockey": "Hóquei no Gelo",
+  hockey: "Hóquei no Gelo",
+  "field hockey": "Hóquei na Grama",
+  baseball: "Beisebol",
+  rugby: "Rúgbi",
+  golf: "Golfe",
+  motorsport: "Automobilismo",
+  "motor sport": "Automobilismo",
+  cricket: "Críquete",
+  darts: "Dardos",
+  snooker: "Sinuca",
+  "table tennis": "Tênis de Mesa",
+  "water polo": "Polo Aquático",
+  cycling: "Ciclismo",
+  athletics: "Atletismo",
+  badminton: "Badminton",
+  "australian football": "Futebol Australiano",
+};
+
 export function mapSportLabel(strSport: string): string {
-  const s = strSport.toLowerCase();
-  if (s === "soccer") return "Futebol";
-  if (s === "basketball") return "Basquete";
-  if (s === "tennis") return "Tênis";
-  if (s === "mma" || s === "fighting") return "MMA";
-  if (s === "esports") return "eSports";
-  if (s === "american football") return "NFL";
-  if (s === "volleyball") return "Vôlei";
-  return strSport || "Outro";
+  return SPORT_LABELS[strSport.trim().toLowerCase()] ?? (strSport || "Outro");
 }
 
 /**

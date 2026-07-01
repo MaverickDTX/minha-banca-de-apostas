@@ -5,6 +5,7 @@ import { computeMetrics, groupBy, oddsBucket } from "@/lib/metrics";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -21,6 +22,29 @@ export default function Analytics() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("all");
+
+  // #18 — recortes rápidos de tempo. Editar as datas manualmente desmarca o preset.
+  const [preset, setPreset] = useState<"7" | "14" | "30" | "90" | "all" | "">("all");
+  const PRESETS = [
+    { key: "7", days: 7, label: "7d" },
+    { key: "14", days: 14, label: "14d" },
+    { key: "30", days: 30, label: "30d" },
+    { key: "90", days: 90, label: "90d" },
+    { key: "all", days: null, label: "Tudo" },
+  ] as const;
+
+  function applyPreset(key: typeof PRESETS[number]["key"], days: number | null) {
+    setPreset(key);
+    if (days == null) {
+      setFrom("");
+      setTo("");
+      return;
+    }
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    setFrom(d.toISOString().slice(0, 10));
+    setTo("");
+  }
 
   const filtered = useMemo(() => {
     return bets.filter((b) => {
@@ -85,9 +109,23 @@ export default function Analytics() {
       </div>
 
       <div className="surface p-3 flex flex-wrap items-center gap-2">
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-[160px]" />
+        <div className="flex items-center gap-1 mr-1">
+          {PRESETS.map((p) => (
+            <Button
+              key={p.key}
+              type="button"
+              size="sm"
+              variant={preset === p.key ? "default" : "outline"}
+              className="h-8 px-3"
+              onClick={() => applyPreset(p.key, p.days)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset(""); }} className="w-[160px]" />
         <span className="text-muted-foreground text-sm">até</span>
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-[160px]" />
+        <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset(""); }} className="w-[160px]" />
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
           <SelectContent>
