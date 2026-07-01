@@ -5,6 +5,7 @@ const KEY = "3";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 
 import { translateEventName, translateLeague, translateTeamName } from "@/lib/translate";
+import { searchEventsApiSports } from "@/lib/apisports";
 
 export type SportEvent = {
   id: string;
@@ -96,14 +97,15 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     }
   } catch { /* ignore */ }
 
-  // 2) Team search → next 5 AND last 5 matches, for up to 3 best team hits.
+  // 2) Team search → next 5 AND last 5 matches for the best team hit.
   //    "Next" covers upcoming games; "last" covers recently played ones, so
   //    bets logged after the fact can still be autocompleted.
+  //    Limited to 1 team to stay within TheSportsDB free tier (30 req/min).
   try {
     const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(q)}`, { signal });
     if (res.ok) {
       const json = await res.json();
-      const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 3) : [];
+      const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 1) : [];
       const [nexts, lasts] = await Promise.all([
         Promise.all(
           teams.map((t) =>
@@ -130,7 +132,7 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     }
   } catch { /* ignore */ }
 
-  const list = Array.from(results.values())
+  let list = Array.from(results.values())
     .sort((a, b) => {
       const at = a.date ? Date.parse(a.date) : Infinity;
       const bt = b.date ? Date.parse(b.date) : Infinity;
@@ -143,6 +145,17 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     })
     .slice(0, 15);
 
-  sportCache.set(q.toLowerCase(), list);
+  // Fallback: if TheSportsDB returned nothing, try API-Sports (football only).
+  if (list.length === 0) {
+    try {
+      const fallback = await searchEventsApiSports(q, signal);
+      list = fallback.slice(0, 15);
+    } catch { /* ignore */ }
+  }
+
+  // Only cache non-empty results so failed/empty searches can be retried.
+  if (list.length > 0) {
+    sportCache.set(q.toLowerCase(), list);
+  }
   return list;
 }

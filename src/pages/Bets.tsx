@@ -183,12 +183,6 @@ export default function Bets() {
     setSelectedIds([]);
   }
 
-  const totals = useMemo(() => {
-    const stake = filtered.reduce((s, b) => s + Number(b.stake_amount || 0), 0);
-    const profit = filtered.reduce((s, b) => s + Number(b.net_profit || 0), 0);
-    return { stake, profit, count: filtered.length };
-  }, [filtered]);
-
   async function setStatusQuick(b: Bet, newStatus: BetStatus) {
     const stake = Number(b.stake_amount);
     const odds = Number(b.odds);
@@ -340,11 +334,6 @@ export default function Bets() {
       Limpar Filtros
     </Button>
   )}
-        <div className="ml-auto text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{totals.count}</span> apostas ·
-          Stake <span className="font-mono">{formatCurrency(totals.stake, currency)}</span> ·
-          Lucro <span className={`font-mono ${totals.profit > 0 ? "positive" : totals.profit < 0 ? "negative" : ""}`}>{formatCurrency(totals.profit, currency)}</span>
-        </div>
       </div>
 
       {view === "cards" ? (

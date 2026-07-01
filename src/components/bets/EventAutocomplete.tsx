@@ -31,7 +31,7 @@ export function EventAutocomplete({
 
   useEffect(() => {
     const q = value.trim();
-    if (q.length < 2) { setResults([]); setLoading(false); return; }
+    if (q.length < 2) { setResults([]); setLoading(false); setOpen(false); return; }
     const handle = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
@@ -41,7 +41,7 @@ export function EventAutocomplete({
         const list = await searchEvents(q, ctrl.signal);
         if (!ctrl.signal.aborted) {
           setResults(list);
-          setOpen(list.length > 0);
+          setOpen(true);
         }
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
@@ -84,7 +84,7 @@ export function EventAutocomplete({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {results.length === 0 ? (
-          <div className="p-3 text-xs text-muted-foreground">Sem resultados.</div>
+          <div className="p-3 text-xs text-muted-foreground">Nenhum evento encontrado.</div>
         ) : (
           <ul className="py-1">
             {results.map((ev) => (
