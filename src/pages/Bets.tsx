@@ -15,6 +15,7 @@ import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
 import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
 import { BetCard } from "@/components/bets/BetCard";
+import { BetsPagination } from "@/components/bets/BetsPagination";
 import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -134,6 +135,15 @@ export default function Bets() {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  function goToPage(n: number) {
+    const target = Math.min(Math.max(1, n), totalPages);
+    const p = new URLSearchParams(searchParams);
+    p.set("page", String(target));
+    setSearchParams(p);
+    setSelectedIds([]);
+  }
 
   const totals = useMemo(() => {
     const stake = filtered.reduce((s, b) => s + Number(b.stake_amount || 0), 0);
@@ -255,23 +265,7 @@ export default function Bets() {
               />
             ))}
           </div>
-          {filtered.length > pageSize && (
-            <div className="flex items-center justify-center gap-4">
-              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => {
-                const p = new URLSearchParams(searchParams);
-                p.set("page", String(page - 1));
-                setSearchParams(p);
-                setSelectedIds([]);
-              }}><ChevronLeft className="h-4 w-4 mr-1" /> Anterior</Button>
-              <span className="text-sm text-muted-foreground">Página {page} de {Math.ceil(filtered.length / pageSize)}</span>
-              <Button variant="outline" size="sm" disabled={page >= Math.ceil(filtered.length / pageSize)} onClick={() => {
-                const p = new URLSearchParams(searchParams);
-                p.set("page", String(page + 1));
-                setSearchParams(p);
-                setSelectedIds([]);
-              }}>Próximo <ChevronRight className="h-4 w-4 ml-1" /></Button>
-            </div>
-          )}
+          <BetsPagination page={page} totalPages={totalPages} onGoTo={goToPage} />
         </div>
       ) : (
       <div className="surface overflow-x-auto">
@@ -389,23 +383,7 @@ export default function Bets() {
             ))}
           </TableBody>
         </Table>
-        {filtered.length > pageSize && (
-          <div className="flex items-center justify-center gap-4 p-4 border-t">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => {
-              const p = new URLSearchParams(searchParams);
-              p.set("page", String(page - 1));
-              setSearchParams(p);
-              setSelectedIds([]);
-            }}><ChevronLeft className="h-4 w-4 mr-1" /> Anterior</Button>
-            <span className="text-sm text-muted-foreground">Página {page} de {Math.ceil(filtered.length / pageSize)}</span>
-            <Button variant="outline" size="sm" disabled={page >= Math.ceil(filtered.length / pageSize)} onClick={() => {
-              const p = new URLSearchParams(searchParams);
-              p.set("page", String(page + 1));
-              setSearchParams(p);
-              setSelectedIds([]);
-            }}>Próximo <ChevronRight className="h-4 w-4 ml-1" /></Button>
-          </div>
-        )}
+        <BetsPagination page={page} totalPages={totalPages} onGoTo={goToPage} className="p-4 border-t" />
       </div>
       )}
 
