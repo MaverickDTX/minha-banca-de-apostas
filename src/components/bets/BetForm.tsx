@@ -21,6 +21,7 @@ import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { EventAutocomplete } from "@/components/bets/EventAutocomplete";
 import { SelectionAutocomplete } from "@/components/bets/SelectionAutocomplete";
 import { MarketAutocomplete } from "@/components/bets/MarketAutocomplete";
+import { TipsterAutocomplete } from "@/components/bets/TipsterAutocomplete";
 import { LegsEditor, type EditableLeg } from "@/components/bets/LegsEditor";
 
 const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
@@ -315,6 +316,9 @@ export function BetForm({
                 <Field label="Odd">
                   <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
                 </Field>
+                <Field label="Tipster" className="md:col-span-2">
+                  <TipsterAutocomplete value={tipster} onChange={setTipster} />
+                </Field>
               </>
             )}
 
@@ -469,9 +473,11 @@ export function BetForm({
               </Field>
             )}
 
-            <Field label="Tipster / fonte">
-              <Input value={tipster} onChange={(e) => setTipster(e.target.value)} />
-            </Field>
+            {isMultiple && (
+              <Field label="Tipster">
+                <TipsterAutocomplete value={tipster} onChange={setTipster} />
+              </Field>
+            )}
             <Field label="Tags (separe por vírgula)" className="md:col-span-2">
               <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="value, underdog, asian-handicap" />
             </Field>

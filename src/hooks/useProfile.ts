@@ -15,6 +15,7 @@ export type Profile = {
   stake_warning_percent: number;
   theme: string;
   default_bookmaker: string | null;
+  tipsters: string[];
 };
 
 export function useProfile() {

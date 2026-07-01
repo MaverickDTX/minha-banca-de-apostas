@@ -30,7 +30,20 @@ export default function SettingsPage() {
     stake_warning_percent: 5,
     theme: "dark",
     default_bookmaker: "" as string,
+    tipsters: [] as string[],
   });
+  const [newTipster, setNewTipster] = useState("");
+
+  function addTipster() {
+    const t = newTipster.trim();
+    if (!t) return;
+    if (form.tipsters.some((x) => x.toLowerCase() === t.toLowerCase())) { setNewTipster(""); return; }
+    setForm({ ...form, tipsters: [...form.tipsters, t].sort((a, b) => a.localeCompare(b, "pt-BR")) });
+    setNewTipster("");
+  }
+  function removeTipster(t: string) {
+    setForm({ ...form, tipsters: form.tipsters.filter((x) => x !== t) });
+  }
 
   useEffect(() => {
     if (profile) {
@@ -45,6 +58,7 @@ export default function SettingsPage() {
         stake_warning_percent: Number(profile.stake_warning_percent),
         theme: profile.theme,
         default_bookmaker: profile.default_bookmaker ?? "",
+        tipsters: profile.tipsters ?? [],
       });
     }
   }, [profile]);
@@ -128,6 +142,30 @@ export default function SettingsPage() {
             <Label className="mb-1 block">Casa de aposta padrão</Label>
             <BookmakerSelect value={form.default_bookmaker} onChange={(v) => setForm({ ...form, default_bookmaker: v })} />
           </div>
+        </div>
+
+        <div>
+          <Label className="mb-1 block">Tipsters</Label>
+          <p className="text-xs text-muted-foreground mb-2">Cadastre as fontes das suas tips. Elas aparecem como sugestões ao registrar apostas.</p>
+          <div className="flex gap-2">
+            <Input
+              value={newTipster}
+              onChange={(e) => setNewTipster(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTipster(); } }}
+              placeholder="Nome do tipster"
+            />
+            <Button type="button" variant="outline" onClick={addTipster}>Adicionar</Button>
+          </div>
+          {form.tipsters.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {form.tipsters.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-sm">
+                  {t}
+                  <button type="button" onClick={() => removeTipster(t)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover ${t}`}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end"><Button type="submit" disabled={update.isPending}>{update.isPending ? "Salvando..." : "Salvar"}</Button></div>
