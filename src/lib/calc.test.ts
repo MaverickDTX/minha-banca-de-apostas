@@ -141,10 +141,9 @@ describe("isSettled", () => {
 });
 
 describe("isWinLikeForHitRate", () => {
-  it("green / half_green / cashout = win", () => {
+  it("green / half_green = win", () => {
     expect(isWinLikeForHitRate("green")).toBe("win");
     expect(isWinLikeForHitRate("half_green")).toBe("win");
-    expect(isWinLikeForHitRate("cashout")).toBe("win");
   });
   it("red / half_red = loss", () => {
     expect(isWinLikeForHitRate("red")).toBe("loss");
@@ -153,6 +152,22 @@ describe("isWinLikeForHitRate", () => {
   it("void / pendente = skip", () => {
     expect(isWinLikeForHitRate("void")).toBe("skip");
     expect(isWinLikeForHitRate("pendente")).toBe("skip");
+  });
+  it("cashout classifica pelo sinal do net_profit", () => {
+    expect(isWinLikeForHitRate("cashout", 12.5)).toBe("win");
+    expect(isWinLikeForHitRate("cashout", -4)).toBe("loss");
+  });
+  it("cashout break-even ou sem net_profit = skip", () => {
+    expect(isWinLikeForHitRate("cashout", 0)).toBe("skip");
+    expect(isWinLikeForHitRate("cashout", null)).toBe("skip");
+    expect(isWinLikeForHitRate("cashout")).toBe("skip");
+  });
+});
+
+describe("kellyStake — clamp em zero", () => {
+  it("Kelly negativo (sem edge) recomenda 0, nunca stake negativa", () => {
+    // estProb 40% @ odds 2.0 → kelly -0.2 → sem clamp seria -50
+    expect(kellyStake(40, 2, 1000, 0.25)).toBe(0);
   });
 });
 

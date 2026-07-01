@@ -28,14 +28,20 @@ export function computeMetrics(bets: Bet[]): Metrics {
   const settledStake = settled.reduce((s, b) => s + (b.is_free_bet ? 0 : Number(b.stake_amount || 0)), 0);
   const netProfit = settled.reduce((s, b) => s + Number(b.net_profit || 0), 0);
   const stakeTotal = bets.reduce((s, b) => s + (b.is_free_bet ? 0 : Number(b.stake_amount || 0)), 0);
-  const hitCount = settled.filter((b) => isWinLikeForHitRate(b.status) === "win").length;
-  const lossCount = settled.filter((b) => isWinLikeForHitRate(b.status) === "loss").length;
+  const hitCount = settled.filter((b) => isWinLikeForHitRate(b.status, b.net_profit) === "win").length;
+  const lossCount = settled.filter((b) => isWinLikeForHitRate(b.status, b.net_profit) === "loss").length;
   const hitTotal = hitCount + lossCount;
   const avgOdds = settled.length ? settled.reduce((s, b) => s + Number(b.odds), 0) / settled.length : 0;
   const avgStake = bets.length ? stakeTotal / bets.length : 0;
 
-  // Cumulative + drawdown — order ascending by date
-  const ordered = [...settled].sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
+  // Cumulative + drawdown — order ascending by date.
+  // Desempate por created_at: sem ele, apostas do mesmo bet_date teriam ordem
+  // indeterminada e drawdown/streak variariam entre execuções.
+  const ordered = [...settled].sort(
+    (a, b) =>
+      new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime() ||
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
   let peak = 0;
   let cum = 0;
   let maxDd = 0;
@@ -50,7 +56,7 @@ export function computeMetrics(bets: Bet[]): Metrics {
   let streakType: "green" | "red" | "none" = "none";
   let streakCount = 0;
   for (let i = ordered.length - 1; i >= 0; i--) {
-    const t = isWinLikeForHitRate(ordered[i].status);
+    const t = isWinLikeForHitRate(ordered[i].status, ordered[i].net_profit);
     if (t === "skip") continue;
     const cur = t === "win" ? "green" : "red";
     if (streakType === "none") { streakType = cur; streakCount = 1; continue; }
@@ -61,6 +67,8 @@ export function computeMetrics(bets: Bet[]): Metrics {
   const bestGreen = settled.reduce((m, b) => Math.max(m, Number(b.net_profit || 0)), 0);
   const worstRed = settled.reduce((m, b) => Math.min(m, Number(b.net_profit || 0)), 0);
 
+  // avgClv/avgEv: média aritmética simples por aposta (não ponderada por stake).
+  // Decisão deliberada: mede habilidade por decisão, não retorno por capital.
   const clvBets = settled.filter((b) => b.clv != null);
   const avgClv = clvBets.length ? clvBets.reduce((s, b) => s + Number(b.clv), 0) / clvBets.length : 0;
   const evBets = settled.filter((b) => b.ev != null);

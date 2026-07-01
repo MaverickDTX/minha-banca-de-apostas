@@ -107,7 +107,8 @@ export function kellyStake(
   fraction: number,
 ): number {
   const k = kellyDecimal(estProb, odds);
-  return bankroll * k * fraction;
+  // Kelly negativo = sem edge → stake recomendada é 0, nunca negativa.
+  return Math.max(0, bankroll * k * fraction);
 }
 
 export function clvPercent(odds: number, closingOdds?: number | null): number | null {
@@ -119,10 +120,18 @@ export function isSettled(status: BetStatus): boolean {
   return status !== "pendente";
 }
 
-export function isWinLikeForHitRate(status: BetStatus): "win" | "loss" | "skip" {
+export function isWinLikeForHitRate(
+  status: BetStatus,
+  netProfit?: number | null,
+): "win" | "loss" | "skip" {
   if (status === "green" || status === "half_green") return "win";
   if (status === "red" || status === "half_red") return "loss";
-  if (status === "cashout") return "win"; // treat as resolved
+  if (status === "cashout") {
+    // Classifica pelo resultado financeiro: cashout com prejuízo é derrota.
+    // Break-even (0) ou lucro desconhecido não conta no hit rate (como void).
+    if (netProfit == null || Number(netProfit) === 0) return "skip";
+    return Number(netProfit) > 0 ? "win" : "loss";
+  }
   return "skip";
 }
 

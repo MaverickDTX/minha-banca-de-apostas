@@ -92,6 +92,27 @@ describe("computeMetrics", () => {
     const m2 = computeMetrics([A, C, v]); // ordenado: A green, C green, void(skip)
     expect(m2.currentStreak).toEqual({ type: "green", count: 2 });
   });
+
+  it("cashout entra no hit rate pelo sinal do net_profit", () => {
+    const coWin = makeBet({ status: "cashout", odds: 2, stake_amount: 100, net_profit: 30, bet_date: "2026-02-01T12:00:00Z" });
+    const coLoss = makeBet({ status: "cashout", odds: 2, stake_amount: 100, net_profit: -40, bet_date: "2026-02-02T12:00:00Z" });
+    const coEven = makeBet({ status: "cashout", odds: 2, stake_amount: 100, net_profit: 0, bet_date: "2026-02-03T12:00:00Z" });
+    // 1 win, 1 loss, 1 skip → 50%
+    const m3 = computeMetrics([coWin, coLoss, coEven]);
+    expect(m3.hitRate).toBeCloseTo(50, 6);
+    // streak: coEven é skip; último resultado válido é coLoss → red
+    expect(m3.currentStreak).toEqual({ type: "red", count: 1 });
+  });
+
+  it("mesmo bet_date: created_at desempata a ordem (drawdown determinístico)", () => {
+    const d = "2026-03-01T12:00:00Z";
+    const loss = makeBet({ status: "red", odds: 2, stake_amount: 100, net_profit: -100, bet_date: d, created_at: "2026-03-01T12:00:01Z" });
+    const win = makeBet({ status: "green", odds: 2, stake_amount: 100, net_profit: 100, bet_date: d, created_at: "2026-03-01T12:00:02Z" });
+    // ordem cronológica real: loss (dd -100), depois win (cum 0)
+    const m4 = computeMetrics([win, loss]); // input embaralhado de propósito
+    expect(m4.maxDrawdown).toBe(-100);
+    expect(m4.currentStreak).toEqual({ type: "green", count: 1 });
+  });
 });
 
 describe("computeBankroll", () => {
