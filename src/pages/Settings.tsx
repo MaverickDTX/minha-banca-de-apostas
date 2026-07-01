@@ -104,11 +104,17 @@ export default function SettingsPage() {
   }
 
   // #15a — troca de senha (Supabase Auth). Apagar conta fica p/ #15b (exige Edge Function).
-  const [pw, setPw] = useState({ next: "", confirm: "" });
+  // O projeto tem "Require current password when changing password" habilitado no
+  // dashboard, então o updateUser exige `current_password`.
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwSaving, setPwSaving] = useState(false);
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
+    if (!pw.current) {
+      toast.error("Informe a senha atual");
+      return;
+    }
     if (pw.next.length < 8) {
       toast.error("A nova senha precisa ter pelo menos 8 caracteres");
       return;
@@ -118,18 +124,24 @@ export default function SettingsPage() {
       return;
     }
     setPwSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: pw.next });
+    const { error } = await supabase.auth.updateUser({
+      password: pw.next,
+      current_password: pw.current,
+    });
     setPwSaving(false);
     if (error) {
+      const msg = error.message.toLowerCase();
       toast.error(
-        error.message.includes("different from the old password")
-          ? "A nova senha deve ser diferente da atual"
-          : `Erro ao trocar a senha: ${error.message}`,
+        msg.includes("current password")
+          ? "Senha atual incorreta"
+          : msg.includes("different from the old password")
+            ? "A nova senha deve ser diferente da atual"
+            : `Erro ao trocar a senha: ${error.message}`,
       );
       return;
     }
     toast.success("Senha alterada com sucesso");
-    setPw({ next: "", confirm: "" });
+    setPw({ current: "", next: "", confirm: "" });
   }
 
   return (
@@ -278,6 +290,15 @@ export default function SettingsPage() {
       <form onSubmit={changePassword} className="space-y-4">
         <Box title="Segurança" description="Troque a senha da sua conta. Mínimo de 8 caracteres.">
           <div className="grid md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <Label>Senha atual</Label>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={pw.current}
+                onChange={(e) => setPw({ ...pw, current: e.target.value })}
+              />
+            </div>
             <div>
               <Label>Nova senha</Label>
               <Input
