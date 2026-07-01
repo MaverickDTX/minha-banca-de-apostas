@@ -57,6 +57,7 @@ export type Bet = {
   stake_units: number | null;
   unit_value_at_bet: number | null;
   status: BetStatus;
+  is_free_bet: boolean;
   gross_return: number | null;
   net_profit: number | null;
   estimated_probability: number | null;

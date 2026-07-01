@@ -101,6 +101,7 @@ export function BetForm({
   );
   const [tags, setTags] = useState<string>(initial?.tags?.join(", ") ?? "");
   const [tipster, setTipster] = useState(initial?.tipster ?? "");
+  const [is_free_bet, setIsFreeBet] = useState<boolean>(initial?.is_free_bet ?? false);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [external_link, setExternalLink] = useState(initial?.external_link ?? "");
 
@@ -144,6 +145,7 @@ export function BetForm({
       gross_return: cashoutReturn ?? null,
       kelly_fraction_setting: profile?.kelly_fraction ?? 0.25,
       bankroll: bankrollNow,
+      is_free_bet,
       legs: isMultiple ? legsAsBetLeg : undefined,
     });
     const effectiveOdds = derived.odds;
@@ -164,7 +166,7 @@ export function BetForm({
       effectiveOdds,
       effectiveStatus: derived.status,
     };
-  }, [odds, closing_odds, stake_amount, estimated_probability, status, cashoutReturn, bankrollNow, profile?.kelly_fraction, isMultiple, legsAsBetLeg]);
+  }, [odds, closing_odds, stake_amount, estimated_probability, status, cashoutReturn, bankrollNow, profile?.kelly_fraction, isMultiple, legsAsBetLeg, is_free_bet]);
 
   useEffect(() => {
     if (profile?.unit_value && stake_amount === 0 && !initial) {
@@ -211,6 +213,7 @@ export function BetForm({
       stake_units: profile?.unit_value ? stake_amount / profile.unit_value : null,
       unit_value_at_bet: profile?.unit_value ?? null,
       status: isMultiple ? calc.effectiveStatus : status,
+      is_free_bet,
       gross_return: calc.gross,
       net_profit: calc.net,
       estimated_probability: estimated_probability ?? null,
@@ -361,6 +364,19 @@ export function BetForm({
                   className="text-xs text-muted-foreground cursor-pointer"
                 >
                   Manter informações do evento
+                </Label>
+              </div>
+            )}
+            {!isMultiple && (
+              <div className="flex items-center space-x-2 self-end pb-2">
+                <Switch
+                  checked={is_free_bet}
+                  onCheckedChange={setIsFreeBet}
+                  className="data-[state=checked]:bg-emerald-500"
+                  id="free-bet"
+                />
+                <Label htmlFor="free-bet" className="text-xs text-muted-foreground cursor-pointer">
+                  Free bet (aposta grátis)
                 </Label>
               </div>
             )}
