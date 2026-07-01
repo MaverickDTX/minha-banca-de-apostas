@@ -13,7 +13,7 @@ import { StatCard } from "@/components/StatCard";
 import { computeBankroll, computeMetrics } from "@/lib/metrics";
 import { formatCurrency, formatDateTime, formatPercent } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Sparkles } from "lucide-react";
+import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Sparkles, Wallet, PiggyBank, TrendingUp, TrendingDown, Target, Gauge, Ruler, ListChecks } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function BankrollPage() {
@@ -106,16 +106,16 @@ export default function BankrollPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-        <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} />
-        <StatCard label="Banca inicial" value={formatCurrency(profile?.initial_bankroll ?? 0, currency)} />
-        <StatCard label="Lucro de apostas" value={formatCurrency(bank.betsProfit, currency)} tone={bank.betsProfit > 0 ? "positive" : bank.betsProfit < 0 ? "negative" : "neutral"} />
+        <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} />
+        <StatCard label="Banca inicial" value={formatCurrency(profile?.initial_bankroll ?? 0, currency)} icon={PiggyBank} />
+        <StatCard label="Lucro de apostas" value={formatCurrency(bank.betsProfit, currency)} icon={bank.betsProfit >= 0 ? TrendingUp : TrendingDown} tone={bank.betsProfit > 0 ? "positive" : bank.betsProfit < 0 ? "negative" : "neutral"} />
         <StatCard label="Depósitos" value={formatCurrency(bank.deposits, currency)} icon={ArrowDownToLine} />
         <StatCard label="Saques" value={formatCurrency(bank.withdrawals, currency)} icon={ArrowUpFromLine} />
         <StatCard label="Bônus" value={formatCurrency(bank.bonuses, currency)} icon={Sparkles} />
-        <StatCard label="ROI sobre banca inicial" value={formatPercent(roiInitial)} tone={roiInitial > 0 ? "positive" : roiInitial < 0 ? "negative" : "neutral"} />
-        <StatCard label="ROI sobre capital" value={formatPercent(roiCapital)} tone={roiCapital > 0 ? "positive" : roiCapital < 0 ? "negative" : "neutral"} />
-        <StatCard label="Unidade atual" value={formatCurrency(profile?.unit_value ?? 0, currency)} hint={profile?.unit_mode === "percent" ? `${profile?.unit_percent}% da banca` : "Fixa"} />
-        <StatCard label="Apostas liquidadas" value={metrics.settledBets} />
+        <StatCard label="ROI sobre banca inicial" value={formatPercent(roiInitial)} icon={Target} tone={roiInitial > 0 ? "positive" : roiInitial < 0 ? "negative" : "neutral"} />
+        <StatCard label="ROI sobre capital" value={formatPercent(roiCapital)} icon={Gauge} tone={roiCapital > 0 ? "positive" : roiCapital < 0 ? "negative" : "neutral"} />
+        <StatCard label="Unidade atual" value={formatCurrency(profile?.unit_value ?? 0, currency)} icon={Ruler} hint={profile?.unit_mode === "percent" ? `${profile?.unit_percent}% da banca` : "Fixa"} />
+        <StatCard label="Apostas liquidadas" value={metrics.settledBets} icon={ListChecks} />
       </div>
 
       <div className="surface p-4">
