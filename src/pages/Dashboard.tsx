@@ -148,11 +148,11 @@ export default function Dashboard() {
               />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <Tooltip
-                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                 formatter={(v: number) => formatCurrency(v, currency)}
                 labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
               />
-              <Area type="monotone" dataKey="banca" stroke="hsl(var(--primary))" fill="url(#bk)" strokeWidth={2} />
+              <Area type="monotone" dataKey="banca" name="Banca" stroke="hsl(var(--primary))" fill="url(#bk)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -163,8 +163,8 @@ export default function Dashboard() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis dataKey="status" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-              <Bar dataKey="count" radius={[4,4,0,0]}>
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
+              <Bar dataKey="count" name="Apostas" radius={[4,4,0,0]}>
                 {statusBreak.map((s) => (
                   <Cell key={s.key} fill={
                     s.key === "green" || s.key === "half_green" ? "hsl(var(--success))" :
@@ -183,8 +183,8 @@ export default function Dashboard() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
-              <Bar dataKey="profit" radius={[4,4,0,0]}>
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Bar dataKey="profit" name="Lucro" radius={[4,4,0,0]}>
                 {byMonth.map((d, i) => <Cell key={i} fill={d.profit >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />)}
               </Bar>
             </BarChart>
@@ -197,8 +197,8 @@ export default function Dashboard() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={95} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
-              <Bar dataKey="lucro" radius={[0,4,4,0]}>
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Bar dataKey="lucro" name="Lucro" radius={[0,4,4,0]}>
                 {bySport.map((d, i) => <Cell key={i} fill={d.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />)}
               </Bar>
             </BarChart>

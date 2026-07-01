@@ -14,8 +14,7 @@ import { computeBankroll, computeMetrics } from "@/lib/metrics";
 import { formatCurrency, formatDateTime, formatPercent } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Sparkles } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { isSettled } from "@/lib/calc";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function BankrollPage() {
   useEffect(() => { document.title = "Bankroll · Bankroll Pro"; }, []);
@@ -50,32 +49,26 @@ export default function BankrollPage() {
     setOpen(false); setAmount(0); setBook(""); setNotes("");
   }
 
-  // Evolution curve (initial + tx + settled bets ordered)
-  const evolution = useMemo(() => {
-    type E = { date: number; delta: number; label: string };
-    const events: E[] = [];
-    for (const t of txs) {
-      let d = Number(t.amount);
-      if (t.tx_type === "withdrawal") d = -d;
-      if (t.tx_type === "adjustment") d = Number(t.amount);
-      if (!["deposit", "withdrawal", "bonus", "adjustment"].includes(t.tx_type)) continue;
-      events.push({ date: new Date(t.tx_date).getTime(), delta: d, label: TX_LABELS[t.tx_type] });
-    }
-    for (const b of bets) {
-      if (!isSettled(b.status)) continue;
-      events.push({ date: new Date(b.bet_date).getTime(), delta: Number(b.net_profit || 0), label: "Aposta" });
-    }
-    events.sort((a, b) => a.date - b.date);
-    let cum = Number(profile?.initial_bankroll ?? 0);
-    // Eixo numérico (timestamp) — ponto inicial 1 dia antes do primeiro evento.
-    const t0 = events.length > 0 ? events[0].date - 86400000 : Date.now();
-    const pts = [{ t: t0, banca: cum }];
-    for (const e of events) {
-      cum += e.delta;
-      pts.push({ t: e.date, banca: cum });
-    }
-    return pts;
-  }, [txs, bets, profile]);
+  // Composição da banca (cascata): de onde veio o valor atual.
+  // Substitui o gráfico de evolução, que duplicava o do Dashboard.
+  const waterfall = useMemo(() => {
+    const steps = [
+      { name: "Inicial", delta: Number(profile?.initial_bankroll ?? 0), always: true },
+      { name: "Depósitos", delta: bank.deposits, always: false },
+      { name: "Bônus", delta: bank.bonuses, always: false },
+      { name: "Ajustes", delta: bank.adjustments, always: false },
+      { name: "Saques", delta: -bank.withdrawals, always: false },
+      { name: "Apostas", delta: bank.betsProfit, always: true },
+    ].filter((s) => s.always || s.delta !== 0);
+    let cum = 0;
+    const rows = steps.map((s) => {
+      const base = Math.min(cum, cum + s.delta);
+      cum += s.delta;
+      return { name: s.name, base, altura: Math.abs(s.delta), delta: s.delta, total: false };
+    });
+    rows.push({ name: "Atual", base: Math.min(0, cum), altura: Math.abs(cum), delta: cum, total: true });
+    return rows;
+  }, [bank, profile]);
 
   return (
     <div className="space-y-6">
@@ -126,33 +119,38 @@ export default function BankrollPage() {
       </div>
 
       <div className="surface p-4">
-        <h3 className="text-sm font-semibold mb-3">Evolução da banca</h3>
+        <h3 className="text-sm font-semibold mb-1">Composição da banca</h3>
+        <p className="text-xs text-muted-foreground mb-3">Como a banca inicial virou a banca atual: cada barra soma (ou subtrai) sobre a anterior.</p>
         <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={evolution}>
-            <defs>
-              <linearGradient id="bk2" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <BarChart data={waterfall}>
             <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="t"
-              type="number"
-              scale="time"
-              domain={["dataMin", "dataMax"]}
-              tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={11}
-            />
+            <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
             <Tooltip
-              contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
-              formatter={(v: number) => formatCurrency(v, currency)}
-              labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
+              contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+              formatter={(_v: number, _n: string, item: { payload?: { delta: number } }) =>
+                formatCurrency(item?.payload?.delta ?? 0, currency)
+              }
+              labelFormatter={(l: string) => l}
+              cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }}
             />
-            <Area type="monotone" dataKey="banca" stroke="hsl(var(--accent))" fill="url(#bk2)" strokeWidth={2} />
-          </AreaChart>
+            {/* Base invisível empilha a barra na altura acumulada (waterfall). */}
+            <Bar dataKey="base" stackId="wf" fill="transparent" isAnimationActive={false} tooltipType="none" />
+            <Bar dataKey="altura" name="Variação" stackId="wf" radius={[4, 4, 0, 0]}>
+              {waterfall.map((r, i) => (
+                <Cell
+                  key={i}
+                  fill={
+                    r.total || r.name === "Inicial"
+                      ? "hsl(var(--accent))"
+                      : r.delta >= 0
+                        ? "hsl(var(--success))"
+                        : "hsl(var(--destructive))"
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
 

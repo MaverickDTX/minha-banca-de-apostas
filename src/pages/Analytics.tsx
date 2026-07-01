@@ -117,12 +117,12 @@ export default function Analytics() {
               />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <Tooltip
-                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                 formatter={(v: number) => formatCurrency(v, currency)}
                 labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
               />
-              <Line type="monotone" dataKey="lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="drawdown" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="lucro" name="Lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="drawdown" name="Drawdown" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -133,8 +133,8 @@ export default function Analytics() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis dataKey="faixa" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-              <Bar dataKey="n" fill="hsl(var(--accent))" radius={[4,4,0,0]} />
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
+              <Bar dataKey="n" name="Apostas" fill="hsl(var(--accent))" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -145,7 +145,7 @@ export default function Analytics() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis type="number" dataKey="stake" name="Stake" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis type="number" dataKey="lucro" name="Lucro" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} formatter={(v: number) => formatCurrency(v, currency)} />
               <Scatter data={scatter}>
                 {scatter.map((p, i) => <Cell key={i} fill={p.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />)}
               </Scatter>
