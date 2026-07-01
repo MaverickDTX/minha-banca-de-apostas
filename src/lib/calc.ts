@@ -33,22 +33,25 @@ export function computeNetProfit(
   stake: number,
   odds: number,
   cashoutReturn?: number | null,
+  freeBet = false,
 ): number {
   switch (status) {
     case "green":
       return stake * (odds - 1);
     case "red":
-      return -stake;
+      // Freebet (SNR): perder não custa nada — o token não era dinheiro seu.
+      return freeBet ? 0 : -stake;
     case "void":
     case "pendente":
       return 0;
     case "half_green":
       return (stake * (odds - 1)) / 2;
     case "half_red":
-      return -stake / 2;
+      return freeBet ? 0 : -stake / 2;
     case "cashout":
       if (cashoutReturn == null) return 0;
-      return cashoutReturn - stake;
+      // Numa freebet, você não colocou dinheiro; o retorno do cashout é lucro líquido.
+      return freeBet ? cashoutReturn : cashoutReturn - stake;
   }
 }
 
@@ -57,8 +60,14 @@ export function computeGrossReturn(
   stake: number,
   odds: number,
   cashoutReturn?: number | null,
+  freeBet = false,
 ): number {
-  const net = computeNetProfit(status, stake, odds, cashoutReturn);
+  const net = computeNetProfit(status, stake, odds, cashoutReturn, freeBet);
+  if (freeBet) {
+    // Freebet (SNR): a stake não retorna. Retorno bruto = ganhos (0 se perder/anular).
+    if (status === "cashout") return cashoutReturn ?? 0;
+    return Math.max(0, net);
+  }
   if (status === "red" || status === "half_red") return stake + net;
   if (status === "void") return stake;
   if (status === "pendente") return 0;
@@ -163,6 +172,7 @@ export function recomputeBetDerived(b: {
   gross_return?: number | null; // used as cashout return when status === "cashout"
   kelly_fraction_setting?: number; // user's preferred Kelly fraction (0..1)
   bankroll?: number;
+  is_free_bet?: boolean;
   /** Quando informado (aposta múltipla), odds e status são derivados das pernas. */
   legs?: BetLeg[];
 }): {
@@ -181,8 +191,9 @@ export function recomputeBetDerived(b: {
   const odds = b.legs && b.legs.length > 0 ? computeMultipleOdds(b.legs) : b.odds;
   const cashoutReturn =
     status === "cashout" && b.gross_return != null ? Number(b.gross_return) : undefined;
-  const net = computeNetProfit(status, b.stake_amount, odds, cashoutReturn);
-  const gross = computeGrossReturn(status, b.stake_amount, odds, cashoutReturn);
+  const freeBet = b.is_free_bet ?? false;
+  const net = computeNetProfit(status, b.stake_amount, odds, cashoutReturn, freeBet);
+  const gross = computeGrossReturn(status, b.stake_amount, odds, cashoutReturn, freeBet);
   const implied = impliedProbability(odds);
   const estProb = b.estimated_probability;
   const edge = estProb != null ? edgeValue(estProb, odds) : null;

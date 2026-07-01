@@ -24,9 +24,10 @@ export type Metrics = {
 
 export function computeMetrics(bets: Bet[]): Metrics {
   const settled = bets.filter((b) => isSettled(b.status));
-  const settledStake = settled.reduce((s, b) => s + Number(b.stake_amount || 0), 0);
+  // Freebets não são capital real arriscado — a stake não entra no turnover (yield/ROI).
+  const settledStake = settled.reduce((s, b) => s + (b.is_free_bet ? 0 : Number(b.stake_amount || 0)), 0);
   const netProfit = settled.reduce((s, b) => s + Number(b.net_profit || 0), 0);
-  const stakeTotal = bets.reduce((s, b) => s + Number(b.stake_amount || 0), 0);
+  const stakeTotal = bets.reduce((s, b) => s + (b.is_free_bet ? 0 : Number(b.stake_amount || 0)), 0);
   const hitCount = settled.filter((b) => isWinLikeForHitRate(b.status) === "win").length;
   const lossCount = settled.filter((b) => isWinLikeForHitRate(b.status) === "loss").length;
   const hitTotal = hitCount + lossCount;
