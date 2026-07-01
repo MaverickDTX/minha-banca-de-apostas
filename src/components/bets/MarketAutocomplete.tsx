@@ -1,25 +1,28 @@
 import { useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { COMMON_MARKETS } from "@/lib/marketSuggestions";
+import { getMarketSuggestions } from "@/lib/marketSuggestions";
 
 export function MarketAutocomplete({
   value,
   onChange,
+  sport,
   placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
+  sport?: string;
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
 
+  const options = useMemo(() => getMarketSuggestions(sport), [sport]);
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return COMMON_MARKETS;
-    return COMMON_MARKETS.filter((m) => m.toLowerCase().includes(q));
-  }, [value]);
+    if (!q) return options;
+    return options.filter((m) => m.toLowerCase().includes(q));
+  }, [value, options]);
 
   return (
     <Popover open={open && filtered.length > 0} onOpenChange={setOpen}>

@@ -174,6 +174,7 @@ export function LegsEditor({
               <MarketAutocomplete
                 value={leg.market}
                 onChange={(v) => update(idx, { market: v, selection: "" })}
+                sport={leg.sport}
               />
             </LegField>
             <LegField label="Seleção" className="md:col-span-2">

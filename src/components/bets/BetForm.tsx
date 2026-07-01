@@ -301,7 +301,7 @@ export function BetForm({
                 </Field>
 
                 <Field label="Mercado">
-                  <MarketAutocomplete value={market} onChange={changeMarket} placeholder="Ex: Resultado final" />
+                  <MarketAutocomplete value={market} onChange={changeMarket} sport={sport} placeholder="Ex: Resultado final" />
                 </Field>
                 <Field label="Seleção" className="md:col-span-2">
                   <SelectionAutocomplete
@@ -414,7 +414,7 @@ export function BetForm({
                   />
                 </Field>
                 <Field label="Mercado">
-                  <MarketAutocomplete value={market} onChange={changeMarket} />
+                  <MarketAutocomplete value={market} onChange={changeMarket} sport={sport} />
                 </Field>
                 <Field label="Seleção" className="md:col-span-2">
                   <SelectionAutocomplete
