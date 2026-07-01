@@ -351,6 +351,11 @@ export function BetForm({
                 </Select>
               </Field>
             )}
+            {!isMultiple && status === "cashout" && (
+              <Field label="Retorno do cashout">
+                <Input type="number" step="0.01" value={cashoutReturn ?? ""} onChange={(e) => setCashoutReturn(e.target.value ? parseFloat(e.target.value) : undefined)} />
+              </Field>
+            )}
             {!isMultiple && (
               <div className="flex items-center space-x-2 self-end pb-2">
                 <Switch

@@ -191,8 +191,9 @@ export default function Bets() {
       id: b.id,
       patch: {
         status: newStatus,
-        net_profit: computeNetProfit(newStatus, stake, odds),
-        gross_return: computeGrossReturn(newStatus, stake, odds),
+        // is_free_bet: mesmo fix do handleBulkStatus — freebet perdida não custa stake.
+        net_profit: computeNetProfit(newStatus, stake, odds, null, b.is_free_bet),
+        gross_return: computeGrossReturn(newStatus, stake, odds, null, b.is_free_bet),
       },
     });
     toast.success(`Marcada como ${STATUS_LABELS[newStatus]}`);
