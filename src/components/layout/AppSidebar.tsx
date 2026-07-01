@@ -95,4 +95,5 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
-  
+  );
+}
