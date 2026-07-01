@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,35 @@ export default function SettingsPage() {
     await update.mutateAsync({ ...form, default_bookmaker: form.default_bookmaker || null });
     toast.success("Configurações salvas");
     document.documentElement.classList.toggle("dark", form.theme === "dark");
+  }
+
+  // #15a — troca de senha (Supabase Auth). Apagar conta fica p/ #15b (exige Edge Function).
+  const [pw, setPw] = useState({ next: "", confirm: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (pw.next.length < 8) {
+      toast.error("A nova senha precisa ter pelo menos 8 caracteres");
+      return;
+    }
+    if (pw.next !== pw.confirm) {
+      toast.error("As senhas não coincidem");
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pw.next });
+    setPwSaving(false);
+    if (error) {
+      toast.error(
+        error.message.includes("different from the old password")
+          ? "A nova senha deve ser diferente da atual"
+          : `Erro ao trocar a senha: ${error.message}`,
+      );
+      return;
+    }
+    toast.success("Senha alterada com sucesso");
+    setPw({ next: "", confirm: "" });
   }
 
   return (
@@ -243,6 +273,36 @@ export default function SettingsPage() {
         </Box>
 
         <div className="flex justify-end"><Button type="submit" disabled={update.isPending}>{update.isPending ? "Salvando..." : "Salvar"}</Button></div>
+      </form>
+
+      <form onSubmit={changePassword} className="space-y-4">
+        <Box title="Segurança" description="Troque a senha da sua conta. Mínimo de 8 caracteres.">
+          <div className="grid md:grid-cols-2 gap-3">
+            <div>
+              <Label>Nova senha</Label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={pw.next}
+                onChange={(e) => setPw({ ...pw, next: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Confirmar nova senha</Label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={pw.confirm}
+                onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" variant="outline" disabled={pwSaving || !pw.next}>
+              {pwSaving ? "Alterando..." : "Alterar senha"}
+            </Button>
+          </div>
+        </Box>
       </form>
     </div>
   );
