@@ -9,8 +9,8 @@ export type Metrics = {
   stakeTotal: number;
   settledStake: number;
   netProfit: number;
-  roi: number;            // %
-  yield: number;          // %
+  /** Yield = lucro / total apostado (turnover) das liquidadas. % */
+  yield: number;
   hitRate: number;        // %
   avgOdds: number;
   avgStake: number;
@@ -72,7 +72,6 @@ export function computeMetrics(bets: Bet[]): Metrics {
     stakeTotal,
     settledStake,
     netProfit,
-    roi: settledStake > 0 ? (netProfit / settledStake) * 100 : 0,
     yield: settledStake > 0 ? (netProfit / settledStake) * 100 : 0,
     hitRate: hitTotal > 0 ? (hitCount / hitTotal) * 100 : 0,
     avgOdds,

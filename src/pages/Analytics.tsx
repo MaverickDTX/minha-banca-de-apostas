@@ -92,7 +92,7 @@ export default function Analytics() {
           </SelectContent>
         </Select>
         <div className="ml-auto text-xs text-muted-foreground">
-          {m.totalBets} apostas · Lucro <span className={m.netProfit >= 0 ? "positive font-mono" : "negative font-mono"}>{formatCurrency(m.netProfit, currency)}</span> · ROI <span className="font-mono">{formatPercent(m.roi)}</span>
+          {m.totalBets} apostas · Lucro <span className={m.netProfit >= 0 ? "positive font-mono" : "negative font-mono"}>{formatCurrency(m.netProfit, currency)}</span> · Yield <span className="font-mono">{formatPercent(m.yield)}</span>
         </div>
       </div>
 
@@ -178,7 +178,7 @@ function GroupTable({ rows, currency }: { rows: { key: string; metrics: ReturnTy
             <TableHead className="text-right">Apostas</TableHead>
             <TableHead className="text-right">Stake</TableHead>
             <TableHead className="text-right">Lucro</TableHead>
-            <TableHead className="text-right">ROI</TableHead>
+            <TableHead className="text-right">Yield</TableHead>
             <TableHead className="text-right">Acerto</TableHead>
             <TableHead className="text-right">Odd média</TableHead>
             <TableHead className="text-right">Stake média</TableHead>
@@ -196,7 +196,7 @@ function GroupTable({ rows, currency }: { rows: { key: string; metrics: ReturnTy
               <TableCell className="text-right">{r.metrics.totalBets}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(r.metrics.stakeTotal, currency)}</TableCell>
               <TableCell className={`text-right font-mono ${r.metrics.netProfit > 0 ? "positive" : r.metrics.netProfit < 0 ? "negative" : ""}`}>{formatCurrency(r.metrics.netProfit, currency)}</TableCell>
-              <TableCell className={`text-right font-mono ${r.metrics.roi > 0 ? "positive" : r.metrics.roi < 0 ? "negative" : ""}`}>{formatPercent(r.metrics.roi)}</TableCell>
+              <TableCell className={`text-right font-mono ${r.metrics.yield > 0 ? "positive" : r.metrics.yield < 0 ? "negative" : ""}`}>{formatPercent(r.metrics.yield)}</TableCell>
               <TableCell className="text-right font-mono">{formatPercent(r.metrics.hitRate, 1)}</TableCell>
               <TableCell className="text-right font-mono">{formatNumber(r.metrics.avgOdds, 2)}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(r.metrics.avgStake, currency)}</TableCell>

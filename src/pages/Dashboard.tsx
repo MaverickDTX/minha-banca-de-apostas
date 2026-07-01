@@ -20,6 +20,9 @@ export default function Dashboard() {
 
   const metrics = useMemo(() => computeMetrics(bets), [bets]);
   const bank = useMemo(() => computeBankroll(Number(profile?.initial_bankroll ?? 0), bets, txs), [bets, txs, profile]);
+  // ROI = lucro das apostas sobre a banca inicial (crescimento do capital de partida).
+  const initialBankroll = Number(profile?.initial_bankroll ?? 0);
+  const roi = initialBankroll > 0 ? (bank.betsProfit / initialBankroll) * 100 : 0;
 
   const evolution = useMemo(() => {
     const settled = bets
@@ -93,7 +96,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
         <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} />
         <StatCard label="Lucro / prejuízo" value={formatCurrency(metrics.netProfit, currency)} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} />
-        <StatCard label="ROI" value={formatPercent(metrics.roi)} icon={Target} tone={metrics.roi > 0 ? "positive" : metrics.roi < 0 ? "negative" : "neutral"} />
+        <StatCard label="ROI" value={formatPercent(roi)} icon={Target} hint="sobre banca inicial" tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} />
         <StatCard label="Yield" value={formatPercent(metrics.yield)} icon={Activity} tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} />
         <StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} />
         <StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} />

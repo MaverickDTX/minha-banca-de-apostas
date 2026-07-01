@@ -58,8 +58,7 @@ describe("computeMetrics", () => {
   it("lucro líquido só das liquidadas", () => {
     expect(m.netProfit).toBe(100);
   });
-  it("ROI e yield = lucro / stake liquidada", () => {
-    expect(m.roi).toBeCloseTo(40, 6);
+  it("yield = lucro / stake liquidada (turnover)", () => {
     expect(m.yield).toBeCloseTo(40, 6);
   });
   it("taxa de acerto = wins / (wins+losses)", () => {
@@ -82,7 +81,7 @@ describe("computeMetrics", () => {
 
   it("lista vazia não quebra (zeros)", () => {
     const z = computeMetrics([]);
-    expect(z.roi).toBe(0);
+    expect(z.yield).toBe(0);
     expect(z.hitRate).toBe(0);
     expect(z.netProfit).toBe(0);
     expect(z.currentStreak).toEqual({ type: "none", count: 0 });
