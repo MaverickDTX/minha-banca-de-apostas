@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
+import { Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 
 const KELLY_OPTIONS = [
@@ -13,6 +14,18 @@ const KELLY_OPTIONS = [
   { v: "0.25", l: "Quarto de Kelly (1/4)" },
   { v: "0.125", l: "Oitavo de Kelly (1/8)" },
 ];
+
+function Box({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section className="surface p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   useEffect(() => { document.title = "Configurações · Bankroll Pro"; }, []);
@@ -31,19 +44,10 @@ export default function SettingsPage() {
     theme: "dark",
     default_bookmaker: "" as string,
     tipsters: [] as string[],
+    bookmakers: [] as string[],
   });
   const [newTipster, setNewTipster] = useState("");
-
-  function addTipster() {
-    const t = newTipster.trim();
-    if (!t) return;
-    if (form.tipsters.some((x) => x.toLowerCase() === t.toLowerCase())) { setNewTipster(""); return; }
-    setForm({ ...form, tipsters: [...form.tipsters, t].sort((a, b) => a.localeCompare(b, "pt-BR")) });
-    setNewTipster("");
-  }
-  function removeTipster(t: string) {
-    setForm({ ...form, tipsters: form.tipsters.filter((x) => x !== t) });
-  }
+  const [newBookmaker, setNewBookmaker] = useState("");
 
   useEffect(() => {
     if (profile) {
@@ -59,9 +63,37 @@ export default function SettingsPage() {
         theme: profile.theme,
         default_bookmaker: profile.default_bookmaker ?? "",
         tipsters: profile.tipsters ?? [],
+        bookmakers: profile.bookmakers ?? [],
       });
     }
   }, [profile]);
+
+  function setTheme(theme: "dark" | "light") {
+    setForm((f) => ({ ...f, theme }));
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }
+
+  function addTipster() {
+    const t = newTipster.trim();
+    if (!t) return;
+    if (form.tipsters.some((x) => x.toLowerCase() === t.toLowerCase())) { setNewTipster(""); return; }
+    setForm({ ...form, tipsters: [...form.tipsters, t].sort((a, b) => a.localeCompare(b, "pt-BR")) });
+    setNewTipster("");
+  }
+  function removeTipster(t: string) {
+    setForm({ ...form, tipsters: form.tipsters.filter((x) => x !== t) });
+  }
+
+  function addBookmaker() {
+    const b = newBookmaker.trim();
+    if (!b) return;
+    if (form.bookmakers.some((x) => x.toLowerCase() === b.toLowerCase())) { setNewBookmaker(""); return; }
+    setForm({ ...form, bookmakers: [...form.bookmakers, b].sort((a, b2) => a.localeCompare(b2, "pt-BR")) });
+    setNewBookmaker("");
+  }
+  function removeBookmaker(b: string) {
+    setForm({ ...form, bookmakers: form.bookmakers.filter((x) => x !== b) });
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -77,76 +109,96 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">Preferências da sua conta e parâmetros padrão para apostas.</p>
       </div>
 
-      <form onSubmit={save} className="surface p-5 space-y-4">
-        <div><Label>Nome de exibição</Label><Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></div>
+      <form onSubmit={save} className="space-y-4">
+        <Box title="Informações do Perfil">
+          <div>
+            <Label>Nome de exibição</Label>
+            <Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+          </div>
+        </Box>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          <div>
-            <Label>Moeda padrão</Label>
-            <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BRL">Real (BRL)</SelectItem>
-                <SelectItem value="USD">Dólar (USD)</SelectItem>
-                <SelectItem value="EUR">Euro (EUR)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Tema</Label>
-            <Select value={form.theme} onValueChange={(v) => setForm({ ...form, theme: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dark">Escuro</SelectItem>
-                <SelectItem value="light">Claro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Banca inicial</Label>
-            <Input type="number" step="0.01" value={form.initial_bankroll} onChange={(e) => setForm({ ...form, initial_bankroll: parseFloat(e.target.value) || 0 })} />
-          </div>
-          <div>
-            <Label>Modo de unidade</Label>
-            <Select value={form.unit_mode} onValueChange={(v) => setForm({ ...form, unit_mode: v as "fixed" | "percent" })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fixed">Fixa (valor em moeda)</SelectItem>
-                <SelectItem value="percent">Percentual da banca</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {form.unit_mode === "fixed" ? (
+        <Box title="Configurações das Apostas" description="Moeda, banca e parâmetros de stake/Kelly.">
+          <div className="grid md:grid-cols-2 gap-3">
             <div>
-              <Label>Valor da unidade ({form.currency})</Label>
-              <Input type="number" step="0.01" value={form.unit_value} onChange={(e) => setForm({ ...form, unit_value: parseFloat(e.target.value) || 0 })} />
+              <Label>Moeda padrão</Label>
+              <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">Real (BRL)</SelectItem>
+                  <SelectItem value="USD">Dólar (USD)</SelectItem>
+                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
             <div>
-              <Label>Unidade (% da banca)</Label>
-              <Input type="number" step="0.01" value={form.unit_percent} onChange={(e) => setForm({ ...form, unit_percent: parseFloat(e.target.value) || 0 })} />
+              <Label>Banca inicial</Label>
+              <Input type="number" step="0.01" value={form.initial_bankroll} onChange={(e) => setForm({ ...form, initial_bankroll: parseFloat(e.target.value) || 0 })} />
             </div>
-          )}
-          <div>
-            <Label>Fração padrão de Kelly</Label>
-            <Select value={String(form.kelly_fraction)} onValueChange={(v) => setForm({ ...form, kelly_fraction: parseFloat(v) })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{KELLY_OPTIONS.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}</SelectContent>
-            </Select>
+            <div>
+              <Label>Modo de unidade</Label>
+              <Select value={form.unit_mode} onValueChange={(v) => setForm({ ...form, unit_mode: v as "fixed" | "percent" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixa (valor em moeda)</SelectItem>
+                  <SelectItem value="percent">Percentual da banca</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {form.unit_mode === "fixed" ? (
+              <div>
+                <Label>Valor da unidade ({form.currency})</Label>
+                <Input type="number" step="0.01" value={form.unit_value} onChange={(e) => setForm({ ...form, unit_value: parseFloat(e.target.value) || 0 })} />
+              </div>
+            ) : (
+              <div>
+                <Label>Unidade (% da banca)</Label>
+                <Input type="number" step="0.01" value={form.unit_percent} onChange={(e) => setForm({ ...form, unit_percent: parseFloat(e.target.value) || 0 })} />
+              </div>
+            )}
+            <div>
+              <Label>Fração padrão de Kelly</Label>
+              <Select value={String(form.kelly_fraction)} onValueChange={(v) => setForm({ ...form, kelly_fraction: parseFloat(v) })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{KELLY_OPTIONS.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Alerta de stake máxima (% da banca)</Label>
+              <Input type="number" step="0.1" value={form.stake_warning_percent} onChange={(e) => setForm({ ...form, stake_warning_percent: parseFloat(e.target.value) || 0 })} />
+            </div>
           </div>
-          <div>
-            <Label>Alerta de stake máxima (% da banca)</Label>
-            <Input type="number" step="0.1" value={form.stake_warning_percent} onChange={(e) => setForm({ ...form, stake_warning_percent: parseFloat(e.target.value) || 0 })} />
-          </div>
+        </Box>
+
+        <Box title="Casas de Aposta" description="Casa padrão e casas personalizadas (aparecem no seletor ao registrar apostas).">
           <div>
             <Label className="mb-1 block">Casa de aposta padrão</Label>
             <BookmakerSelect value={form.default_bookmaker} onChange={(v) => setForm({ ...form, default_bookmaker: v })} />
           </div>
-        </div>
+          <div>
+            <Label className="mb-1 block">Adicionar casa personalizada</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newBookmaker}
+                onChange={(e) => setNewBookmaker(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addBookmaker(); } }}
+                placeholder="Nome da casa"
+              />
+              <Button type="button" variant="outline" onClick={addBookmaker}>Adicionar</Button>
+            </div>
+            {form.bookmakers.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {form.bookmakers.map((b) => (
+                  <span key={b} className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-sm">
+                    {b}
+                    <button type="button" onClick={() => removeBookmaker(b)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover ${b}`}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Box>
 
-        <div>
-          <Label className="mb-1 block">Tipsters</Label>
-          <p className="text-xs text-muted-foreground mb-2">Cadastre as fontes das suas tips. Elas aparecem como sugestões ao registrar apostas.</p>
+        <Box title="Tipsters" description="Fontes das suas tips — aparecem como sugestões ao registrar apostas.">
           <div className="flex gap-2">
             <Input
               value={newTipster}
@@ -166,7 +218,29 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
-        </div>
+        </Box>
+
+        <Box title="Aparência">
+          <div>
+            <Label className="mb-2 block">Tema</Label>
+            <div className="inline-flex rounded-lg border border-border p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition ${form.theme === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Sun className="h-4 w-4" /> Claro
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition ${form.theme === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Moon className="h-4 w-4" /> Escuro
+              </button>
+            </div>
+          </div>
+        </Box>
 
         <div className="flex justify-end"><Button type="submit" disabled={update.isPending}>{update.isPending ? "Salvando..." : "Salvar"}</Button></div>
       </form>

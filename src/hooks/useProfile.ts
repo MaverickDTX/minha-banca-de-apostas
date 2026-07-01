@@ -16,6 +16,7 @@ export type Profile = {
   theme: string;
   default_bookmaker: string | null;
   tipsters: string[];
+  bookmakers: string[];
 };
 
 export function useProfile() {

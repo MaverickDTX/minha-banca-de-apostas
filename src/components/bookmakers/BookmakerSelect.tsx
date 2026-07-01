@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { BOOKMAKERS, getBookmaker } from "@/lib/bookmakers";
 import { BookmakerLogo } from "./BookmakerLogo";
+import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
 
 export function BookmakerSelect({
@@ -17,6 +18,13 @@ export function BookmakerSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
+  const { data: profile } = useProfile();
+
+  // Casas personalizadas cadastradas nas Configurações que não são nativas.
+  const customBookmakers = useMemo(() => {
+    const nativo = new Set(BOOKMAKERS.map((b) => b.name.toLowerCase()));
+    return (profile?.bookmakers ?? []).filter((b) => b && !nativo.has(b.toLowerCase()));
+  }, [profile?.bookmakers]);
 
   const known = useMemo(() => getBookmaker(value), [value]);
   const isCustom = customMode || (!!value && !known);
@@ -94,6 +102,22 @@ export function BookmakerSelect({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {customBookmakers.length > 0 && (
+              <CommandGroup heading="Personalizadas">
+                {customBookmakers.map((name) => (
+                  <CommandItem
+                    key={name}
+                    value={name}
+                    onSelect={() => { onChange(name); setOpen(false); }}
+                    className="flex items-center gap-2"
+                  >
+                    <BookmakerLogo name={name} size="xs" />
+                    <span className="flex-1">{name}</span>
+                    <Check className={cn("h-4 w-4", value?.toLowerCase() === name.toLowerCase() ? "opacity-100" : "opacity-0")} />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
             <CommandGroup>
               <CommandItem
                 value="__custom__"

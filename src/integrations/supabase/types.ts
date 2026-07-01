@@ -129,6 +129,7 @@ export type Database = {
           gross_return: number | null
           id: string
           implied_probability: number | null
+          is_free_bet: boolean
           kelly_fraction: number | null
           league: string | null
           market: string | null
@@ -164,6 +165,7 @@ export type Database = {
           gross_return?: number | null
           id?: string
           implied_probability?: number | null
+          is_free_bet?: boolean
           kelly_fraction?: number | null
           league?: string | null
           market?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           gross_return?: number | null
           id?: string
           implied_probability?: number | null
+          is_free_bet?: boolean
           kelly_fraction?: number | null
           league?: string | null
           market?: string | null
@@ -220,8 +223,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bets_backup_market_swap_20260630: {
+        Row: {
+          created_at: string | null
+          event_name: string | null
+          id: string
+          market: string | null
+          selection: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_name?: string | null
+          id: string
+          market?: string | null
+          selection?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_name?: string | null
+          id?: string
+          market?: string | null
+          selection?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          bookmakers: string[]
           created_at: string
           currency: string
           default_bookmaker: string | null
@@ -232,12 +260,14 @@ export type Database = {
           kelly_fraction: number
           stake_warning_percent: number
           theme: string
+          tipsters: string[]
           unit_mode: string
           unit_percent: number
           unit_value: number
           updated_at: string
         }
         Insert: {
+          bookmakers?: string[]
           created_at?: string
           currency?: string
           default_bookmaker?: string | null
@@ -248,12 +278,14 @@ export type Database = {
           kelly_fraction?: number
           stake_warning_percent?: number
           theme?: string
+          tipsters?: string[]
           unit_mode?: string
           unit_percent?: number
           unit_value?: number
           updated_at?: string
         }
         Update: {
+          bookmakers?: string[]
           created_at?: string
           currency?: string
           default_bookmaker?: string | null
@@ -264,6 +296,7 @@ export type Database = {
           kelly_fraction?: number
           stake_warning_percent?: number
           theme?: string
+          tipsters?: string[]
           unit_mode?: string
           unit_percent?: number
           unit_value?: number
@@ -401,7 +434,7 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][CompositeTypeName]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
