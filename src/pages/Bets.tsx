@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3, ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3, ChevronLeft, ChevronRight, Layers, SlidersHorizontal } from "lucide-react";
 import { STATUS_COLORS, STATUS_LABELS, computeNetProfit, computeGrossReturn, type BetStatus } from "@/lib/calc";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
@@ -18,6 +18,16 @@ import { BetCard } from "@/components/bets/BetCard";
 import { BetsPagination } from "@/components/bets/BetsPagination";
 import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+
+const ODDS_BUCKETS: { value: string; label: string; test: (odds: number) => boolean }[] = [
+  { value: "lt15", label: "< 1.50", test: (o) => o < 1.5 },
+  { value: "15-2", label: "1.50 – 2.00", test: (o) => o >= 1.5 && o < 2 },
+  { value: "2-3", label: "2.00 – 3.00", test: (o) => o >= 2 && o < 3 },
+  { value: "3-5", label: "3.00 – 5.00", test: (o) => o >= 3 && o < 5 },
+  { value: "gte5", label: "≥ 5.00", test: (o) => o >= 5 },
+];
 
 export default function Bets() {
   useEffect(() => { document.title = "Apostas · Bankroll Pro"; }, []);
@@ -82,14 +92,24 @@ export default function Bets() {
     }
   }
 
-  // Filters from URL
+  // Filters padrão (sempre visíveis) — from URL
   const q = searchParams.get("q") || "";
   const status = searchParams.get("status") || "all";
   const sport = searchParams.get("sport") || "all";
   const bookmaker = searchParams.get("bookmaker") || "all";
+
+  // Filters avançados (atrás do botão "+") — from URL
   const betType = searchParams.get("type") || "all";
   const dateStart = searchParams.get("start") || "";
   const dateEnd = searchParams.get("end") || "";
+  const tipster = searchParams.get("tipster") || "all";
+  const sort = searchParams.get("sort") || "desc"; // desc = mais recentes primeiro
+  const oddsBucket = searchParams.get("odds") || "all";
+  const stakeMin = searchParams.get("stakeMin") || "";
+  const stakeMax = searchParams.get("stakeMax") || "";
+
+  const advancedActive = betType !== "all" || !!dateStart || !!dateEnd || tipster !== "all" || sort !== "desc" || oddsBucket !== "all" || !!stakeMin || !!stakeMax;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Pagination from URL
   const page = Number(searchParams.get("page") || "1");
@@ -114,27 +134,45 @@ export default function Bets() {
 
   const sports = useMemo(() => Array.from(new Set(bets.map((b) => b.sport).filter(Boolean) as string[])), [bets]);
   const books = useMemo(() => Array.from(new Set(bets.map((b) => b.bookmaker).filter(Boolean) as string[])), [bets]);
+  const tipsters = useMemo(() => Array.from(new Set(bets.map((b) => b.tipster).filter(Boolean) as string[])), [bets]);
 
   const filtered = useMemo(() => {
     const lc = q.toLowerCase();
+    const min = stakeMin ? Number(stakeMin) : null;
+    const max = stakeMax ? Number(stakeMax) : null;
+    const bucket = ODDS_BUCKETS.find((b) => b.value === oddsBucket);
     return bets.filter((b) => {
       if (status !== "all" && b.status !== status) return false;
       if (sport !== "all" && b.sport !== sport) return false;
       if (bookmaker !== "all" && b.bookmaker !== bookmaker) return false;
       if (betType !== "all" && b.bet_type !== betType) return false;
+      if (tipster !== "all" && b.tipster !== tipster) return false;
       if (dateStart && new Date(b.bet_date) < new Date(dateStart)) return false;
       if (dateEnd && new Date(b.bet_date) > new Date(dateEnd + "T23:59:59")) return false;
+      if (bucket && !bucket.test(Number(b.odds))) return false;
+      if (min != null && !Number.isNaN(min) && Number(b.stake_amount) < min) return false;
+      if (max != null && !Number.isNaN(max) && Number(b.stake_amount) > max) return false;
       if (!lc) return true;
       return [b.event_name, b.market, b.selection, b.league, b.tipster, b.bookmaker, b.sport].some((f) =>
         (f ?? "").toLowerCase().includes(lc),
       );
     });
-  }, [bets, q, status, sport, bookmaker, betType, dateStart, dateEnd]);
+  }, [bets, q, status, sport, bookmaker, betType, tipster, dateStart, dateEnd, oddsBucket, stakeMin, stakeMax]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const da = new Date(a.bet_date).getTime();
+      const db = new Date(b.bet_date).getTime();
+      return sort === "asc" ? da - db : db - da;
+    });
+    return arr;
+  }, [filtered, sort]);
 
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, page, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   function goToPage(n: number) {
@@ -207,19 +245,81 @@ export default function Bets() {
             {books.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={betType} onValueChange={updateParam.bind(null, "type")}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos tipos</SelectItem>
-            <SelectItem value="simples">Simples</SelectItem>
-            <SelectItem value="multipla">Múltiplas</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2">
-          <Input type="date" className="w-[140px]" value={dateStart} onChange={(e) => updateParam("start", e.target.value)} />
-          <span className="text-xs text-muted-foreground">até</span>
-          <Input type="date" className="w-[140px]" value={dateEnd} onChange={(e) => updateParam("end", e.target.value)} />
-        </div>
+
+        <Popover open={advancedOpen} onOpenChange={setAdvancedOpen}>
+          <PopoverTrigger asChild>
+            <Button variant={advancedActive ? "default" : "outline"} size="sm" className="relative">
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Avançado
+              {advancedActive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[320px] space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipster</Label>
+              <Select value={tipster} onValueChange={updateParam.bind(null, "tipster")}>
+                <SelectTrigger><SelectValue placeholder="Tipster" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos tipsters</SelectItem>
+                  {tipsters.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo</Label>
+              <Select value={betType} onValueChange={updateParam.bind(null, "type")}>
+                <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos tipos</SelectItem>
+                  <SelectItem value="simples">Simples</SelectItem>
+                  <SelectItem value="multipla">Múltiplas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ordenar por data</Label>
+              <Select value={sort} onValueChange={updateParam.bind(null, "sort")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Mais recentes primeiro</SelectItem>
+                  <SelectItem value="asc">Mais antigas primeiro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Faixa de odds</Label>
+              <Select value={oddsBucket} onValueChange={updateParam.bind(null, "odds")}>
+                <SelectTrigger><SelectValue placeholder="Todas odds" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas odds</SelectItem>
+                  {ODDS_BUCKETS.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Faixa de stake</Label>
+              <div className="flex items-center gap-2">
+                <Input type="number" inputMode="decimal" placeholder="Mín." value={stakeMin} onChange={(e) => updateParam("stakeMin", e.target.value)} />
+                <span className="text-xs text-muted-foreground">até</span>
+                <Input type="number" inputMode="decimal" placeholder="Máx." value={stakeMax} onChange={(e) => updateParam("stakeMax", e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Período</Label>
+              <div className="flex items-center gap-2">
+                <Input type="date" value={dateStart} onChange={(e) => updateParam("start", e.target.value)} />
+                <span className="text-xs text-muted-foreground">até</span>
+                <Input type="date" value={dateEnd} onChange={(e) => updateParam("end", e.target.value)} />
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         <Select value={String(pageSize)} onValueChange={(val) => updateParam("size", val)}>
           <SelectTrigger className="w-[110px]"><SelectValue placeholder="Itens/pág" /></SelectTrigger>
           <SelectContent>
@@ -229,7 +329,7 @@ export default function Bets() {
             <SelectItem value="100">100 por pág.</SelectItem>
           </SelectContent>
         </Select>
-          {(q || status !== "all" || sport !== "all" || bookmaker !== "all" || betType !== "all" || dateStart || dateEnd) && (
+          {(q || status !== "all" || sport !== "all" || bookmaker !== "all" || advancedActive) && (
     <Button
       variant="ghost"
       size="sm"
