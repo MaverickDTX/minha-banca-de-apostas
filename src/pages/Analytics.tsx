@@ -83,12 +83,23 @@ export default function Analytics() {
   const cumChart = useMemo(() => {
     const ordered = settled.slice().sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
     let cum = 0; let peak = 0;
-    // t = timestamp para eixo temporal real (antes o eixo exibia índices crus).
-    return ordered.map((b) => {
+    // Agregado por dia: várias apostas no mesmo dia viravam pontos empilhados
+    // (penhascos verticais). Lucro = acumulado no fim do dia; drawdown = pior
+    // vale DENTRO do dia (não subestima o risco intradiário).
+    const byDay = new Map<number, { lucro: number; drawdown: number }>();
+    for (const b of ordered) {
       cum += Number(b.net_profit || 0);
       peak = Math.max(peak, cum);
-      return { t: new Date(b.bet_date).getTime(), lucro: cum, drawdown: cum - peak };
-    });
+      const d = new Date(b.bet_date);
+      d.setHours(0, 0, 0, 0);
+      const t = d.getTime();
+      const prev = byDay.get(t);
+      byDay.set(t, {
+        lucro: cum,
+        drawdown: Math.min(prev?.drawdown ?? 0, cum - peak),
+      });
+    }
+    return Array.from(byDay, ([t, v]) => ({ t, ...v }));
   }, [settled]);
 
   const oddsHist = useMemo(() => {

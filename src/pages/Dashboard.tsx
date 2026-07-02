@@ -30,12 +30,16 @@ export default function Dashboard() {
       .slice()
       .sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
     let cum = Number(profile?.initial_bankroll ?? 0);
-    // Eixo numérico (timestamp): mantém a proporção temporal real — períodos sem
-    // apostas aparecem como planície, não colados (antes o eixo era categórico).
-    const points = settled.map((b) => {
+    // Eixo numérico (timestamp) + agregado por dia (banca no fim do dia):
+    // vários pontos no mesmo dia viravam penhascos verticais na linha.
+    const byDay = new Map<number, number>();
+    for (const b of settled) {
       cum += Number(b.net_profit || 0);
-      return { t: new Date(b.bet_date).getTime(), banca: cum };
-    });
+      const d = new Date(b.bet_date);
+      d.setHours(0, 0, 0, 0);
+      byDay.set(d.getTime(), cum);
+    }
+    const points = Array.from(byDay, ([t, banca]) => ({ t, banca }));
     if (points.length === 0) {
       points.push({ t: Date.now(), banca: Number(profile?.initial_bankroll ?? 0) });
     }
