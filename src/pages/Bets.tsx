@@ -426,7 +426,7 @@ export default function Bets() {
                 </TableCell>
                 <TableCell>
                   {b.bet_type === "multipla" ? (
-                    <div className="text-xs text-muted-foreground">Ver detalhes ao editar</div>
+                    <div className="text-xs text-muted-foreground">Múltipla · pernas em Editar</div>
                   ) : (
                     <>
                       <div className="text-sm">{b.market || "—"}</div>

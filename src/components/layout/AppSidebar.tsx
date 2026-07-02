@@ -31,7 +31,7 @@ const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Apostas", url: "/apostas", icon: ListChecks },
   { title: "Nova aposta", url: "/nova-aposta", icon: PlusCircle },
-  { title: "Bankroll", url: "/bankroll", icon: Wallet },
+  { title: "Banca", url: "/bankroll", icon: Wallet },
   { title: "Análises", url: "/analises", icon: BarChart3 },
   { title: "Calendário", url: "/calendario", icon: CalendarDays },
   { title: "Importar / Exportar", url: "/importar", icon: FileUp },

@@ -17,7 +17,7 @@ import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Sparkles, Wallet, Piggy
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function BankrollPage() {
-  useEffect(() => { document.title = "Bankroll · Bankroll Pro"; }, []);
+  useEffect(() => { document.title = "Banca · Bankroll Pro"; }, []);
   const { data: txs = [] } = useTransactions();
   const { data: bets = [] } = useBets();
   const { data: profile } = useProfile();
@@ -74,7 +74,7 @@ export default function BankrollPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bankroll</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Banca</h1>
           <p className="text-sm text-muted-foreground">Controle de entradas, saídas e evolução da banca.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
