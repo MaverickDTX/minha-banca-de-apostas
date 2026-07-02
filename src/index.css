@@ -56,23 +56,23 @@
 
   .dark {
     /* Temperatura verde-carvão (hue 160) no lugar do cinza-azulado genérico (222). */
-    --background: 160 18% 5%;
-    --foreground: 160 12% 96%;
+    --background: 160 8% 5%;
+    --foreground: 160 6% 96%;
 
-    --card: 160 14% 8%;
-    --card-foreground: 160 12% 96%;
+    --card: 160 6% 8%;
+    --card-foreground: 160 6% 96%;
 
-    --popover: 160 16% 7%;
+    --popover: 160 7% 7%;
     --popover-foreground: 160 12% 96%;
 
     --primary: 152 72% 46%;
     --primary-foreground: 222 40% 6%;
 
-    --secondary: 160 12% 13%;
+    --secondary: 160 6% 13%;
     --secondary-foreground: 160 12% 96%;
 
-    --muted: 160 10% 14%;
-    --muted-foreground: 160 8% 64%;
+    --muted: 160 5% 14%;
+    --muted-foreground: 160 4% 64%;
 
     --accent: 197 90% 56%;
     --accent-foreground: 222 40% 6%;
@@ -85,15 +85,15 @@
     --warning: 38 95% 56%;
     --warning-foreground: 222 40% 6%;
 
-    --border: 160 12% 16%;
-    --input: 160 12% 16%;
+    --border: 160 6% 16%;
+    --input: 160 6% 16%;
     --ring: 152 72% 46%;
 
-    --sidebar-background: 160 20% 4%;
-    --sidebar-foreground: 160 10% 78%;
+    --sidebar-background: 160 9% 4%;
+    --sidebar-foreground: 160 5% 78%;
     --sidebar-primary: 152 72% 46%;
     --sidebar-primary-foreground: 222 40% 6%;
-    --sidebar-accent: 160 16% 10%;
+    --sidebar-accent: 160 7% 10%;
     --sidebar-accent-foreground: 210 30% 96%;
     --sidebar-border: 222 18% 12%;
     --sidebar-ring: 152 72% 46%;
@@ -139,6 +139,6 @@ h1, h2, h3 {
   font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 .font-mono, .stat-value {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
