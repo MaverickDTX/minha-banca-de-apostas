@@ -340,7 +340,9 @@ export default function Bets() {
 
       {view === "cards" ? (
         <div className="space-y-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {/* grid-cols-1 explícito: a coluna implícita usa piso min-content e as
+              linhas nowrap (truncate) dos cards estouravam a tela no mobile. */}
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {isLoading && <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Carregando...</div>}
             {!isLoading && filtered.length === 0 && (
               <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Nenhuma aposta encontrada.</div>

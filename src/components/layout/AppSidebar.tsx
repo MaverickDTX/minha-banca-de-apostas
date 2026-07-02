@@ -22,6 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -41,6 +42,8 @@ export function AppSidebar() {
   const { pathname } = useLocation();
   const { signOut, user } = useAuth();
   const { data: profile } = useProfile();
+  // No mobile a sidebar é um Sheet; navegar não fecha sozinho — fechamos no clique.
+  const { setOpenMobile } = useSidebar();
 
   return (
     <Sidebar collapsible="icon">
@@ -66,7 +69,7 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                      <NavLink to={item.url} end className="flex items-center gap-2">
+                      <NavLink to={item.url} end className="flex items-center gap-2" onClick={() => setOpenMobile(false)}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </NavLink>
