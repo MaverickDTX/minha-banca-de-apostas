@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { TrendingUp, Loader2 } from "lucide-react";
+import { CircleDollarSign, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Auth() {
@@ -45,7 +45,7 @@ export default function Auth() {
       <div className="hidden lg:flex flex-col justify-between p-10 bg-gradient-to-br from-primary/15 via-background to-accent/10 border-r border-border">
         <div className="flex items-center gap-2">
           <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-            <TrendingUp className="h-6 w-6 text-primary" />
+            <CircleDollarSign className="h-6 w-6 text-primary" />
           </div>
           <span className="text-xl font-semibold">Bankroll Pro</span>
         </div>

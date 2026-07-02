@@ -9,7 +9,7 @@ import {
   FileUp,
   Settings,
   LogOut,
-  TrendingUp,
+  CircleDollarSign,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,7 +50,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center">
-            <TrendingUp className="h-5 w-5 text-primary" />
+            <CircleDollarSign className="h-5 w-5 text-primary" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-semibold text-sidebar-foreground">Bankroll Pro</span>
