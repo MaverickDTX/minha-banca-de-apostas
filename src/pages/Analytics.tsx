@@ -147,8 +147,8 @@ export default function Analytics() {
               <XAxis
                 dataKey="t"
                 type="number"
-                scale="time"
                 domain={["dataMin", "dataMax"]}
+                minTickGap={48}
                 tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
