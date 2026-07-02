@@ -58,6 +58,23 @@ function normalize(e: RawEvent): SportEvent {
 
 const sportCache = new Map<string, SportEvent[]>();
 
+const normText = (s: string) =>
+  s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+
+/** "Time A x Time B" / "A vs B" → [A, B]; senão null. */
+function splitMatchup(q: string): [string, string] | null {
+  const parts = q.split(/\s+(?:x|vs\.?)\s+/i);
+  if (parts.length === 2 && parts[0].trim().length >= 3 && parts[1].trim().length >= 2) {
+    return [parts[0].trim(), parts[1].trim()];
+  }
+  return null;
+}
+
+function matchesOpponent(ev: SportEvent, variants: string[]): boolean {
+  const hay = normText([ev.name, ev.homeTeam ?? "", ev.awayTeam ?? ""].join(" "));
+  return variants.some((v) => hay.includes(normText(v)));
+}
+
 /** Map TheSportsDB/API-Sports sport string to the in-app sport label (PT-BR). */
 const SPORT_LABELS: Record<string, string> = {
   soccer: "Futebol",
@@ -103,28 +120,46 @@ export function mapSportLabel(strSport: string): string {
  */
 export async function searchEvents(query: string, signal?: AbortSignal): Promise<SportEvent[]> {
   const q = query.trim();
-  if (q.length < 2) return [];
-  const cached = sportCache.get(q.toLowerCase());
-  if (cached) return cached;
+  if (q.length < 3) return [];
+
+  // "Time A x Time B": busca pelo time A e filtra os resultados pelo time B.
+  // As APIs não entendem o confronto inteiro (muito menos em português).
+  const matchup = splitMatchup(q);
+  const teamPart = matchup ? matchup[0] : q;
 
   // PT → EN: as APIs indexam nomes em inglês ("Alemanha" não acha "Germany").
-  // Cache continua chaveado pela query original digitada.
-  const searchQ = translateQueryToEnglish(q) ?? q;
+  const searchQ = translateQueryToEnglish(teamPart) ?? teamPart;
+  const opponentVariants = matchup
+    ? [matchup[1], translateQueryToEnglish(matchup[1]) ?? ""].filter(Boolean)
+    : null;
 
+  // Cache pela query EFETIVA (pós-tradução): "estados un", "estados uni"...
+  // resolvem todos para "United States" e reutilizam a mesma entrada.
+  const cacheKey = `${normText(searchQ)}|${matchup ? normText(matchup[1]) : ""}`;
+  const cached = sportCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Distingue "vazio de verdade" de "falha/rate limit": só o primeiro é cacheável.
+  let hadError = false;
   const results = new Map<string, SportEvent>();
 
-  // 1) Direct event-name search.
-  try {
-    const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(searchQ)}`, { signal });
-    if (res.ok) {
-      const json = await res.json();
-      const arr: RawEvent[] = Array.isArray(json?.event) ? json.event : [];
-      for (const raw of arr) {
-        const ev = normalize(raw);
-        if (!results.has(ev.id)) results.set(ev.id, ev);
+  // 1) Direct event-name search (só sem confronto — com confronto o nome do
+  //    evento digitado está em PT e nunca casa com o índice EN).
+  if (!matchup) {
+    try {
+      const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(searchQ)}`, { signal });
+      if (res.ok) {
+        const json = await res.json();
+        const arr: RawEvent[] = Array.isArray(json?.event) ? json.event : [];
+        for (const raw of arr) {
+          const ev = normalize(raw);
+          if (!results.has(ev.id)) results.set(ev.id, ev);
+        }
+      } else {
+        hadError = true;
       }
-    }
-  } catch { /* ignore */ }
+    } catch { hadError = true; }
+  }
 
   // 2) Team search → next 5 AND last 5 matches for the best team hit.
   //    "Next" covers upcoming games; "last" covers recently played ones, so
@@ -158,10 +193,14 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
           if (!results.has(ev.id)) results.set(ev.id, ev);
         }
       }
+    } else {
+      hadError = true;
     }
-  } catch { /* ignore */ }
+  } catch { hadError = true; }
 
-  let list = Array.from(results.values())
+  let list = Array.from(results.values());
+  if (opponentVariants) list = list.filter((ev) => matchesOpponent(ev, opponentVariants));
+  list = list
     .sort((a, b) => {
       const at = a.date ? Date.parse(a.date) : Infinity;
       const bt = b.date ? Date.parse(b.date) : Infinity;
@@ -177,14 +216,16 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
   // Fallback: if TheSportsDB returned nothing, try API-Sports (football only).
   if (list.length === 0) {
     try {
-      const fallback = await searchEventsApiSports(searchQ, signal);
+      let fallback = await searchEventsApiSports(searchQ, signal);
+      if (opponentVariants) fallback = fallback.filter((ev) => matchesOpponent(ev, opponentVariants));
       list = fallback.slice(0, 15);
-    } catch { /* ignore */ }
+    } catch { hadError = true; }
   }
 
-  // Only cache non-empty results so failed/empty searches can be retried.
-  if (list.length > 0) {
-    sportCache.set(q.toLowerCase(), list);
+  // Cacheia não-vazios sempre; vazios só quando não houve falha de rede/rate
+  // limit — um vazio legítimo repetido a cada tecla era o que drenava a quota.
+  if (list.length > 0 || !hadError) {
+    sportCache.set(cacheKey, list);
   }
   return list;
 }

@@ -55,8 +55,9 @@ export async function searchEventsApiSports(
     });
     if (res.ok) {
       const json = await res.json();
+      // 1 time só: cada time custa 2 requests (next+last) e a quota é 100/dia.
       const teams: { team: ApiTeam }[] = Array.isArray(json?.response)
-        ? json.response.slice(0, 2)
+        ? json.response.slice(0, 1)
         : [];
       teamIds = teams.map((t) => t.team.id);
     }

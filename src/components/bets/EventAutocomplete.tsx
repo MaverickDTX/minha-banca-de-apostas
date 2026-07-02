@@ -31,7 +31,9 @@ export function EventAutocomplete({
 
   useEffect(() => {
     const q = value.trim();
-    if (q.length < 2) { setResults([]); setLoading(false); setOpen(false); return; }
+    // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
+    // útil e cada disparo custa até 6 requests somando as duas APIs.
+    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); return; }
     const handle = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
@@ -46,7 +48,7 @@ export function EventAutocomplete({
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }
-    }, 320);
+    }, 500);
     return () => clearTimeout(handle);
   }, [value]);
 
@@ -70,7 +72,7 @@ export function EventAutocomplete({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => { if (results.length > 0) setOpen(true); }}
-            placeholder={placeholder ?? "Ex: Uruguai (digite p/ buscar partidas)"}
+            placeholder={placeholder ?? "Ex: Uruguai ou Brasil x Argentina"}
             autoComplete="off"
           />
           {loading && (

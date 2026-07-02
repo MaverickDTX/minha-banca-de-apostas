@@ -300,7 +300,7 @@ export function BetForm({
                     value={event_name}
                     onChange={setEventName}
                     onPick={applyEventPick}
-                    placeholder="Ex: Uruguai (digite p/ buscar partidas)"
+                    placeholder="Ex: Uruguai ou Brasil x Argentina"
                   />
                 </Field>
 
