@@ -139,7 +139,9 @@ export function BetCard({
   const quickActions = (positionCls: string) => (
     <div
       className={cn(
-        "absolute z-10 hidden md:flex items-center gap-1 rounded-md bg-card",
+        // Barra flutuante estilo Gmail: pode cobrir conteúdo no hover, mas com
+        // borda+sombra p/ ler como toolbar intencional, não como defeito.
+        "absolute z-10 hidden md:flex items-center gap-0.5 rounded-lg bg-card border border-border shadow-lg px-1 py-0.5",
         "opacity-0 pointer-events-none transition-opacity",
         "group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto",
         positionCls,
@@ -206,7 +208,7 @@ export function BetCard({
         >
           {net != null ? formatCurrency(net, currency) : "—"}
         </span>
-        {quickActions("top-1/2 -translate-y-1/2 right-11")}
+        {quickActions("top-1/2 -translate-y-1/2 right-10")}
         {menu}
       </div>
     );
