@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, Rows3, ChevronLeft, ChevronRight, Layers, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, Pencil, Trash2, CheckCircle2, XCircle, MinusCircle, RotateCcw, LayoutGrid, List, Rows3, ChevronLeft, ChevronRight, Layers, SlidersHorizontal } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { STATUS_COLORS, STATUS_LABELS, computeNetProfit, computeGrossReturn, type BetStatus } from "@/lib/calc";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { toast } from "sonner";
@@ -117,7 +118,16 @@ export default function Bets() {
   const pageSize = Number(searchParams.get("size") || "20");
 
   const [toDelete, setToDelete] = useState<Bet | null>(null);
-  const [view, setView] = useState<"cards" | "table">("cards");
+  // Vista persistida — usuário intensivo escolhe compacto uma vez e fica.
+  type ViewMode = "cards" | "compact" | "table";
+  const [view, setViewState] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem("bets:view");
+    return saved === "compact" || saved === "table" ? saved : "cards";
+  });
+  const setView = (v: ViewMode) => {
+    setViewState(v);
+    localStorage.setItem("bets:view", v);
+  };
 
   const updateParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams);
@@ -236,8 +246,9 @@ export default function Bets() {
           <p className="text-sm text-muted-foreground">Todos os registros, com busca, filtros e edição rápida.</p>
         </div>
         <div className="flex items-center gap-2">
-          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "cards" | "table")} variant="outline" size="sm">
+          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)} variant="outline" size="sm">
             <ToggleGroupItem value="cards" aria-label="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="compact" aria-label="Compacto"><List className="h-4 w-4" /></ToggleGroupItem>
             <ToggleGroupItem value="table" aria-label="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
           </ToggleGroup>
           <Button asChild><Link to="/nova-aposta"><PlusCircle className="h-4 w-4 mr-2" />Nova aposta</Link></Button>
@@ -382,18 +393,32 @@ export default function Bets() {
   )}
       </div>
 
-      {view === "cards" ? (
+      {view !== "table" ? (
         <div className="space-y-6">
           {/* grid-cols-1 explícito: a coluna implícita usa piso min-content e as
               linhas nowrap (truncate) dos cards estouravam a tela no mobile. */}
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {isLoading && <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Carregando...</div>}
+          <div className={view === "compact" ? "grid gap-2 grid-cols-1" : "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}>
+            {isLoading &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="surface p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-9 w-9 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/5" />
+                      <Skeleton className="h-3 w-3/5" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-3 w-4/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+              ))}
             {!isLoading && filtered.length === 0 && (
               <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Nenhuma aposta encontrada.</div>
             )}
             {isLoading ? null : paginated.map((b) => (
               <BetCard
                 key={b.id}
+                compact={view === "compact"}
                 bet={b}
                 currency={currency}
                 unitValue={profile?.unit_value}

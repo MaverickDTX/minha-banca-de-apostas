@@ -9,6 +9,7 @@ import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 
 export default function Dashboard() {
@@ -124,11 +125,26 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-        <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} />
-        <StatCard label="Lucro / prejuízo" value={formatCurrency(metrics.netProfit, currency)} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} />
-        <StatCard label="ROI" value={formatPercent(roi)} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} />
-        <StatCard label="Yield" value={formatPercent(metrics.yield)} icon={Activity} info="Lucro dividido pelo total apostado (turnover). Mede a eficiência por real arriscado — 5%+ sustentado é forte." tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} />
+      {/* KPIs primários maiores que os secundários — hierarquia apontada nas avaliações. */}
+      {isLoading && bets.length === 0 ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="surface p-4 space-y-3">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-8 w-3/4" />
+            </div>
+          ))}
+        </div>
+      ) : (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard size="lg" label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} />
+        <StatCard size="lg" label="Lucro / prejuízo" value={formatCurrency(metrics.netProfit, currency)} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} />
+        <StatCard size="lg" label="ROI" value={formatPercent(roi)} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} />
+        <StatCard size="lg" label="Yield" value={formatPercent(metrics.yield)} icon={Activity} info="Lucro dividido pelo total apostado (turnover). Mede a eficiência por real arriscado — 5%+ sustentado é forte." tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} />
+      </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} icon={Banknote} />
         <StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} icon={ListChecks} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} />
         <StatCard label="Taxa de acerto" value={formatPercent(metrics.hitRate, 1)} icon={Percent} info="Apostas ganhas sobre o total decidido (voids e pendentes fora). Sozinha não diz lucro — depende das odds." />

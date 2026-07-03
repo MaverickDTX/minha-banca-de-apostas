@@ -59,12 +59,15 @@ export function BetCard({
   unitValue,
   onStatus,
   onDelete,
+  compact = false,
 }: {
   bet: Bet;
   currency: string;
   unitValue?: number;
   onStatus: (b: Bet, s: BetStatus) => void;
   onDelete: (b: Bet) => void;
+  /** Layout de 1 linha p/ usuário intensivo — mais apostas por tela. */
+  compact?: boolean;
 }) {
   const units =
     bet.stake_units ??
@@ -75,10 +78,136 @@ export function BetCard({
   const [expanded, setExpanded] = useState(false);
   const { data: legs = [] } = useBetLegs(isMultiple ? bet.id : undefined);
 
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 -mr-1">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isMultiple ? (
+          <DropdownMenuItem asChild>
+            <Link to={`/apostas/${bet.id}${window.location.search}`}>
+              <Pencil className="h-4 w-4 mr-2" />Editar pernas p/ atualizar status
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem onClick={() => onStatus(bet, "green")}>
+              <CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Ganha
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatus(bet, "red")}>
+              <XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Perdida
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatus(bet, "half_green")}>
+              <CheckCircle2 className="h-4 w-4 mr-2 opacity-70" />Meio Ganha
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatus(bet, "half_red")}>
+              <XCircle className="h-4 w-4 mr-2 opacity-70" />Meio Perdida
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatus(bet, "void")}>
+              <MinusCircle className="h-4 w-4 mr-2" />Anulada
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatus(bet, "pendente")}>
+              <RotateCcw className="h-4 w-4 mr-2" />Voltar a pendente
+            </DropdownMenuItem>
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to={`/apostas/${bet.id}${window.location.search}`}>
+            <Pencil className="h-4 w-4 mr-2" />Editar
+          </Link>
+        </DropdownMenuItem>
+        {bet.external_link && (
+          <DropdownMenuItem asChild>
+            <a href={bet.external_link} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4 mr-2" />Abrir link
+            </a>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onDelete(bet)} className="text-destructive">
+          <Trash2 className="h-4 w-4 mr-2" />Excluir
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // Quick actions no hover (desktop) — reduz cliques p/ liquidar/editar.
+  const quickActions = (
+    <div className="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      {!isMultiple && bet.status === "pendente" && (
+        <>
+          <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 text-success hover:text-success" aria-label="Marcar Ganha" title="Marcar Ganha" onClick={() => onStatus(bet, "green")}>
+            <CheckCircle2 className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 text-destructive hover:text-destructive" aria-label="Marcar Perdida" title="Marcar Perdida" onClick={() => onStatus(bet, "red")}>
+            <XCircle className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+      <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1" asChild>
+        <Link to={`/apostas/${bet.id}${window.location.search}`} aria-label="Editar" title="Editar"><Pencil className="h-4 w-4" /></Link>
+      </Button>
+    </div>
+  );
+
+  if (compact) {
+    const clv = bet.clv != null ? Number(bet.clv) : null;
+    return (
+      <div
+        className={cn(
+          "surface group relative pl-3 pr-2 py-2 flex items-center gap-3 transition hover:border-foreground/20",
+          "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
+          STATUS_ACCENT[bet.status],
+        )}
+      >
+        <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-medium truncate">
+              {isMultiple ? `Múltipla: ${legs[0]?.event_name || bet.event_name || "—"}` : bet.event_name || "—"}
+            </span>
+            <Badge variant="outline" className={cn("text-[10px] uppercase shrink-0", STATUS_COLORS[bet.status])}>
+              {STATUS_LABELS[bet.status]}
+            </Badge>
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {bet.bookmaker || "—"}
+            {bet.market ? ` · ${bet.market}` : ""}
+            {bet.selection ? ` — ${bet.selection}` : ""}
+            {" · "}{formatDate(bet.bet_date)}
+          </div>
+        </div>
+        <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-sm">
+          <span className="text-muted-foreground">@{formatNumber(Number(bet.odds), 2)}</span>
+          <span>{formatCurrency(Number(bet.stake_amount), currency)}</span>
+          {clv != null && (
+            <span className={cn("font-semibold", clv > 0 ? "positive" : clv < 0 ? "negative" : "")}>
+              {clv > 0 ? "↑" : clv < 0 ? "↓" : ""} {formatPercent(clv)}
+            </span>
+          )}
+        </div>
+        <span
+          className={cn(
+            "font-mono tabular-nums text-sm font-semibold min-w-[84px] text-right shrink-0",
+            net != null && net > 0 && "positive",
+            net != null && net < 0 && "negative",
+          )}
+        >
+          {net != null ? formatCurrency(net, currency) : "—"}
+        </span>
+        {quickActions}
+        {menu}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "surface relative pl-4 pr-3 py-3 flex flex-col gap-2 transition hover:border-foreground/20",
+        "surface group relative pl-4 pr-3 py-3 flex flex-col gap-2 transition hover:border-foreground/20",
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
         STATUS_ACCENT[bet.status],
       )}
@@ -88,7 +217,7 @@ export function BetCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold truncate">{bet.bookmaker || "Sem casa"}</span>
-            <Badge variant="outline" className={cn("text-[10px] uppercase", STATUS_COLORS[bet.status])}>
+            <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide", STATUS_COLORS[bet.status])}>
               {STATUS_LABELS[bet.status]}
             </Badge>
           </div>
@@ -100,59 +229,8 @@ export function BetCard({
             <span>· {formatDate(bet.bet_date)}</span>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 -mr-1">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {isMultiple ? (
-              <DropdownMenuItem asChild>
-                <Link to={`/apostas/${bet.id}${window.location.search}`}>
-                  <Pencil className="h-4 w-4 mr-2" />Editar pernas p/ atualizar status
-                </Link>
-              </DropdownMenuItem>
-            ) : (
-              <>
-                <DropdownMenuItem onClick={() => onStatus(bet, "green")}>
-                  <CheckCircle2 className="h-4 w-4 mr-2 text-success" />Marcar Ganha
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatus(bet, "red")}>
-                  <XCircle className="h-4 w-4 mr-2 text-destructive" />Marcar Perdida
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatus(bet, "half_green")}>
-                  <CheckCircle2 className="h-4 w-4 mr-2 opacity-70" />Meio Ganha
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatus(bet, "half_red")}>
-                  <XCircle className="h-4 w-4 mr-2 opacity-70" />Meio Perdida
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatus(bet, "void")}>
-                  <MinusCircle className="h-4 w-4 mr-2" />Anulada
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onStatus(bet, "pendente")}>
-                  <RotateCcw className="h-4 w-4 mr-2" />Voltar a pendente
-                </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to={`/apostas/${bet.id}${window.location.search}`}>
-                <Pencil className="h-4 w-4 mr-2" />Editar
-              </Link>
-            </DropdownMenuItem>
-            {bet.external_link && (
-              <DropdownMenuItem asChild>
-                <a href={bet.external_link} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-2" />Abrir link
-                </a>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => onDelete(bet)} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {quickActions}
+        {menu}
       </div>
 
       <div className="pl-[52px] -mt-1">
@@ -232,9 +310,10 @@ export function BetCard({
         {bet.clv != null && (
           <Metric
             label="CLV"
-            value={formatPercent(Number(bet.clv))}
+            value={`${Number(bet.clv) > 0 ? "↑ " : Number(bet.clv) < 0 ? "↓ " : ""}${formatPercent(Number(bet.clv))}`}
             tone={Number(bet.clv) > 0 ? "positive" : Number(bet.clv) < 0 ? "negative" : undefined}
             mono
+            strong
           />
         )}
         {bet.ev != null && (
@@ -276,18 +355,21 @@ function Metric({
   value,
   tone,
   mono,
+  strong,
 }: {
   label: string;
   value: React.ReactNode;
   tone?: "positive" | "negative";
   mono?: boolean;
+  /** Destaque extra (CLV — métrica-assinatura do produto). */
+  strong?: boolean;
 }) {
   return (
     <div className="flex flex-col">
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "font-medium",
+          strong ? "font-semibold" : "font-medium",
           mono && "font-mono tabular-nums",
           tone === "positive" && "positive",
           tone === "negative" && "negative",

@@ -10,6 +10,7 @@ export function StatCard({
   tone,
   className,
   info,
+  size = "md",
 }: {
   label: string;
   value: React.ReactNode;
@@ -19,6 +20,8 @@ export function StatCard({
   className?: string;
   /** Explicação curta da métrica — vira tooltip com (?) ao lado do rótulo. */
   info?: string;
+  /** "lg" = KPI primário (valor maior) — hierarquia entre métricas. */
+  size?: "md" | "lg";
 }) {
   return (
     <div className={cn("surface p-4 flex flex-col gap-2", className)}>
@@ -41,6 +44,7 @@ export function StatCard({
       <div
         className={cn(
           "stat-value",
+          size === "lg" && "text-3xl",
           tone === "positive" && "positive",
           tone === "negative" && "negative",
         )}
