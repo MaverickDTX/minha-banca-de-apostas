@@ -12,6 +12,17 @@ export default defineConfig(() => ({
     },
   },
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // #22 — bibliotecas pesadas em chunks próprios (cache estável entre deploys).
+        manualChunks: {
+          recharts: ["recharts"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

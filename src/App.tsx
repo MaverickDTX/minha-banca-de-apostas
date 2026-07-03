@@ -1,21 +1,31 @@
+import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import AppLayout from "@/components/layout/AppLayout";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Bets from "./pages/Bets";
-import NewBet from "./pages/NewBet";
-import Bankroll from "./pages/Bankroll";
-import Analytics from "./pages/Analytics";
-import CalendarPage from "./pages/Calendar";
-import ImportExport from "./pages/ImportExport";
-import SettingsPage from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+
+// #22 — code-splitting por rota: cada página vira um chunk carregado sob demanda.
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Bets = lazy(() => import("./pages/Bets"));
+const NewBet = lazy(() => import("./pages/NewBet"));
+const Bankroll = lazy(() => import("./pages/Bankroll"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const CalendarPage = lazy(() => import("./pages/Calendar"));
+const ImportExport = lazy(() => import("./pages/ImportExport"));
+const SettingsPage = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+const PageFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,6 +33,7 @@ const App = () => (
       <Sonner richColors position="top-right" />
       <BrowserRouter>
         <AuthProvider>
+          <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route element={<AppLayout />}>
@@ -38,6 +49,7 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
