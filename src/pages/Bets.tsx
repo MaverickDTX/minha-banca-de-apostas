@@ -350,10 +350,11 @@ export default function Bets() {
 
             <div className="space-y-1.5">
               <Label className="text-xs">Período</Label>
+              {/* min-w-0 + flex-1: input date tem largura intrínseca e vazava do popover. */}
               <div className="flex items-center gap-2">
-                <Input type="date" value={dateStart} onChange={(e) => updateParam("start", e.target.value)} />
-                <span className="text-xs text-muted-foreground">até</span>
-                <Input type="date" value={dateEnd} onChange={(e) => updateParam("end", e.target.value)} />
+                <Input type="date" className="flex-1 min-w-0" value={dateStart} onChange={(e) => updateParam("start", e.target.value)} />
+                <span className="text-xs text-muted-foreground shrink-0">até</span>
+                <Input type="date" className="flex-1 min-w-0" value={dateEnd} onChange={(e) => updateParam("end", e.target.value)} />
               </div>
             </div>
           </PopoverContent>
@@ -488,7 +489,8 @@ export default function Bets() {
                 <TableCell>
                   <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
                 </TableCell>
-                <TableCell className={`text-right font-mono ${Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : ""}`}>
+                {/* whitespace-nowrap: o navegador quebra linha após o "-" de valores negativos. */}
+                <TableCell className={`text-right font-mono whitespace-nowrap ${Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : ""}`}>
                   {b.status !== "pendente" && b.net_profit != null ? formatCurrency(Number(b.net_profit), currency) : "—"}
                 </TableCell>
                 <TableCell className="text-right">
