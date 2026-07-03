@@ -133,6 +133,35 @@ export default function Bets() {
     setSelectedIds([]);  // Limpa as seleções da tabela
   };
 
+  // Filtros rápidos de data (mesmo padrão do #18 nas Análises). Data em fuso
+  // local — toISOString viraria o dia errado perto da meia-noite.
+  const localISO = (daysAgo: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const QUICK_RANGES = [
+    { label: "Hoje", days: 0 },
+    { label: "7d", days: 7 },
+    { label: "30d", days: 30 },
+    { label: "Tudo", days: null },
+  ] as const;
+  const applyQuickRange = (days: number | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (days == null) {
+      params.delete("start");
+      params.delete("end");
+    } else {
+      params.set("start", localISO(days));
+      params.delete("end");
+    }
+    params.set("page", "1");
+    setSearchParams(params);
+    setSelectedIds([]);
+  };
+  const quickActive = (days: number | null) =>
+    days == null ? !dateStart && !dateEnd : dateStart === localISO(days) && !dateEnd;
+
   const sports = useMemo(() => Array.from(new Set(bets.map((b) => b.sport).filter(Boolean) as string[])), [bets]);
   const books = useMemo(() => Array.from(new Set(bets.map((b) => b.bookmaker).filter(Boolean) as string[])), [bets]);
   const tipsters = useMemo(() => Array.from(new Set(bets.map((b) => b.tipster).filter(Boolean) as string[])), [bets]);
@@ -219,6 +248,20 @@ export default function Bets() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
           <Input value={q} onChange={(e) => updateParam("q", e.target.value)} placeholder="Buscar evento, mercado, seleção..." className="pl-8" />
+        </div>
+        <div className="flex items-center gap-1">
+          {QUICK_RANGES.map((r) => (
+            <Button
+              key={r.label}
+              type="button"
+              size="sm"
+              variant={quickActive(r.days) ? "default" : "outline"}
+              className="h-8 px-2.5"
+              onClick={() => applyQuickRange(r.days)}
+            >
+              {r.label}
+            </Button>
+          ))}
         </div>
         <Select value={status} onValueChange={updateParam.bind(null, "status")}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>

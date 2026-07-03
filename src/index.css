@@ -72,7 +72,8 @@
     --secondary-foreground: 262 12% 96%;
 
     --muted: 262 11% 14%;
-    --muted-foreground: 262 9% 64%;
+    /* 71% (era 64%): contraste dos secundários apontado pelas 2 avaliações heurísticas. */
+    --muted-foreground: 262 9% 71%;
 
     --accent: 197 90% 56%;
     --accent-foreground: 222 40% 6%;

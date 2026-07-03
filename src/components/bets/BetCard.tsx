@@ -287,6 +287,7 @@ function Metric({
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
       <span
         className={cn(
+          "font-medium",
           mono && "font-mono tabular-nums",
           tone === "positive" && "positive",
           tone === "negative" && "negative",
