@@ -134,20 +134,28 @@ export function BetCard({
     </DropdownMenu>
   );
 
-  // Quick actions no hover (desktop) — reduz cliques p/ liquidar/editar.
-  const quickActions = (
-    <div className="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+  // Quick actions no hover (desktop). Overlay ABSOLUTO: com opacity-0 no fluxo
+  // os botões reservavam ~100px e quebravam a linha de metadados dos cards.
+  const quickActions = (positionCls: string) => (
+    <div
+      className={cn(
+        "absolute z-10 hidden md:flex items-center gap-1 rounded-md bg-card",
+        "opacity-0 pointer-events-none transition-opacity",
+        "group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto",
+        positionCls,
+      )}
+    >
       {!isMultiple && bet.status === "pendente" && (
         <>
-          <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 text-success hover:text-success" aria-label="Marcar Ganha" title="Marcar Ganha" onClick={() => onStatus(bet, "green")}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-success hover:text-success" aria-label="Marcar Ganha" title="Marcar Ganha" onClick={() => onStatus(bet, "green")}>
             <CheckCircle2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1 text-destructive hover:text-destructive" aria-label="Marcar Perdida" title="Marcar Perdida" onClick={() => onStatus(bet, "red")}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" aria-label="Marcar Perdida" title="Marcar Perdida" onClick={() => onStatus(bet, "red")}>
             <XCircle className="h-4 w-4" />
           </Button>
         </>
       )}
-      <Button size="icon" variant="ghost" className="h-8 w-8 -mt-1" asChild>
+      <Button size="icon" variant="ghost" className="h-8 w-8" asChild>
         <Link to={`/apostas/${bet.id}${window.location.search}`} aria-label="Editar" title="Editar"><Pencil className="h-4 w-4" /></Link>
       </Button>
     </div>
@@ -198,7 +206,7 @@ export function BetCard({
         >
           {net != null ? formatCurrency(net, currency) : "—"}
         </span>
-        {quickActions}
+        {quickActions("top-1/2 -translate-y-1/2 right-11")}
         {menu}
       </div>
     );
@@ -229,7 +237,7 @@ export function BetCard({
             <span>· {formatDate(bet.bet_date)}</span>
           </div>
         </div>
-        {quickActions}
+        {quickActions("top-2.5 right-12")}
         {menu}
       </div>
 
