@@ -21,12 +21,7 @@ export function formatNumber(value: number | null | undefined, digits = 2): stri
 
 export function formatPercent(value: number | null | undefined, digits = 2): string {
   const v = Number(value ?? 0);
-  return `${v >= 0 ? "" : ""}${formatNumber(v, digits)}%`;
-}
-
-export function formatOdds(value: number | null | undefined): string {
-  if (value == null) return "—";
-  return formatNumber(Number(value), 2);
+  return `${formatNumber(v, digits)}%`;
 }
 
 export function formatDate(value: string | Date | null | undefined): string {
@@ -54,10 +49,4 @@ export function toLocalDateKey(value: string | Date | null | undefined): string 
   const d = typeof value === "string" ? new Date(value) : value;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-export function signClass(value: number): string {
-  if (value > 0) return "positive";
-  if (value < 0) return "negative";
-  return "neutral";
 }

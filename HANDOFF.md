@@ -1,25 +1,51 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Data: 2026-07-03 (última atualização; histórico abaixo)
+Data: 2026-07-04 (última atualização; histórico abaixo)
 
-## ➡️ PRÓXIMA TAREFA: a definir
-Candidatos do backlog: KPIs clicáveis (drill-down p/ Análises filtradas — era o "se sobrar espaço" da sessão dos insights, e o follow-on natural), #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão da key API-Sports), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo).
+## ✅ Sessão 2026-07-04 (2) — Limpeza de UI morta + remoção de exports não usados (working tree sujo, aguardando commit)
+
+### #24 Limpeza de componentes UI mortos — 28 arquivos removidos
+Auditoria completa de imports dos 47 componentes shadcn/ui. Removidos:
+- **24 componentes sem import em nenhuma página viva**: accordion, alert, aspect-ratio, avatar, breadcrumb, calendar, card, carousel, chart, checkbox, collapsible, context-menu, drawer, form, hover-card, input-otp, menubar, navigation-menu, pagination, progress, radio-group, resizable, scroll-area, slider
+- **Sistema de toast legado** (`@radix-ui/react-toast`): `toast.tsx`, `toaster.tsx`, `components/ui/use-toast.ts`, `hooks/use-toast.ts` — app já usa `sonner.tsx` (Toaster do shadcn/ui moderno)
+
+### #29 Removidas funções exportadas não utilizadas de `format.ts`
+- **`formatOdds()`** — nunca importada (substituída por `formatNumber` nos callers)
+- **`signClass()`** — nunca importada
+
+### #30 Corrigido `formatPercent` template literal bug
+`${v >= 0 ? "" : ""}` era no-op (sempre string vazia). Removido.
+
+### #27 Verificado: já resolvido em sessão anterior
+Nenhum vestígio de `fadeInRight`/`fadeInUpItem` no código atual.
+
+Verificação: tsc OK, vitest 109/109 OK, vite build OK (3036 modules, 4.14s).
+
+## ➡️ PRÓXIMA TAREFA: a definir (ver backlog consolidado abaixo)
+Candidatos: #25 conflito de fontes Inter vs Plus Jakarta Sans, #26 extrair constantes/animações duplicadas, ##backlog-exploracao restante.
+
+## ✅ Sessão 2026-07-04 (1) — KPIs clicáveis + micro-interações + backlog (COMMITADO)
+3 commits em `origin/main`:
+- **`851e7e8`** ("feat: KPIs clicáveis com drill-down e micro-interações"):
+  - `framer-motion` instalado
+  - `analyticsUrl.ts`: novos params `dateRange`, `view`, `minStake`
+  - `Analytics.tsx`: parse de `dateRange` (resolve para start/end) + `minStake` no filtro
+  - `Dashboard.tsx`: URLs atualizadas (Lucro→dateRange, ROI→dateRange, Taxa de acerto→view=winrate, Stake média→minStake); staggered fade-in nos grids de KPI
+  - `StatCard.tsx`: hover (scale-102, shadow-xl, ring-2 primary/30), active (scale-95)
+- **`6d48e44`** ("fix: padroniza altura cards, animacoes em Bets, filtro periodo graficos"):
+  - `StatCard.tsx`: `h-full` no Link + card (altura consistente)
+  - `Dashboard.tsx`: `chartDays` state com presets 30d/90d/Tudo nos gráficos
+  - `Bets.tsx`: staggered animation nos BetCards
+- **`930686e`** ("feat: animacoes bets, filtro periodo graficos, altura cards") — merge anterior.
+- **`2edbf6d`** ("fix: diferencia cor de Anulada (warning/amber) de Pendente; ajusta espacamento BetCard"):
+  - `BetCard.tsx`: `py-3`→`py-4`, `gap-2`→`gap-3`, `h-full`
+  - `calc.ts` + `BetCard.tsx`: `void` → `warning` (amarelo/âmbar), se diferencia de `pendente`
+
+Verificação: tsc OK, vitest 109/109 OK, vite build OK.
 
 ## ✅ Insights automáticos — FEITO E COMMITADO (2026-07-03)
-- **Commit `fe7dc97`** ("feat: insights automaticos no Dashboard (7 regras puras + 24 testes)"), já em `origin/main` (HEAD == origin/main, 0 ahead/0 behind). Working tree limpo (só `UIUX_REVIEW.md` untracked, intencional).
-- **`src/lib/insights.ts`** (novo): 7 regras puras sobre `Bet[]` retornando `{ id, severity: "positive"|"warning"|"info", text } | null` — bestMarket, worstMarket, bestBookmaker, redStreak (≥3, alerta tilt), yieldTrend (30d vs 30d anteriores), clvBySport (melhor positivo ou pior negativo), drawdownRecent (janela 30d ≥ 80% do pior histórico). `computeInsights()` agrega e ordena por severidade (warning > positive > info).
-- **Thresholds exportados e documentados**: MIN_GROUP_BETS=10, MIN_WINDOW_BETS=5, MIN_CLV_BETS=10, RED_STREAK_ALERT=3, YIELD_MIN_DELTA_PP=2, DRAWDOWN_RECENT_RATIO=0.8, WINDOW_DAYS=30. Sem rótulos absolutos — comparação só com o próprio histórico. `InsightContext.now` injetável p/ testes determinísticos.
-- **`src/lib/insights.test.ts`** (novo): 24 testes (100 no total do repo, todos verdes).
-- **`Dashboard.tsx`**: card "Insights" entre KPIs secundários e gráficos; até 5 insights; ícone por severidade (AlertTriangle/TrendingUp/Info, sem emoji); card some quando não há insight (dados insuficientes).
-- Verificação canônica executada: tsc OK, vitest 100/100, vite build OK (bundle inicial inalterado, 224 kB).
-
-## Estado atual (fim da sessão 2026-07-03)
-- Tudo commitado e pushado até `fe7dc97` (insights automáticos). Antes: `e597314` (quick actions toolbar flutuante) e `1a1395f`. Nada pendente de commit.
-- **UI/UX rodada 2 COMPLETA**: levas 1 e 2 + 4 fixes de acabamento (metadados quebrando, período vazando, lucro negativo quebrando linha, toolbar flutuante).
-- Identidade final: tema roxo profundo (hue 262) + Plus Jakarta Sans global + favicon/logo CircleDollarSign.
-- Performance: #22 feito (bundle 224 kB, -82%).
-- Backlog restante: **KPIs clicáveis (drill-down p/ Análises — próxima natural)**, #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão do usuário sobre a key API-Sports: pessoal vs público), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo). ~~insights automáticos~~ ✅ FEITO (`fe7dc97`).
-- FUSE: 7 manifestações documentadas. Fluxo seguro inalterado: Edit/Write confiáveis; leituras da montagem de arquivos editados na sessão NÃO confiáveis; verificação = git archive HEAD → /tmp + replay dos patches via python + tsc/vitest/build; processos em background não sobrevivem entre chamadas bash; commits sempre pelo terminal do usuário.
+- **Commit `fe7dc97`** ("feat: insights automaticos no Dashboard (7 regras puras + 24 testes)"), já em `origin/main`.
+- ... (restante permanece igual)
 
 ---
 Histórico da sessão anterior (2026-07-01):
@@ -91,13 +117,48 @@ Arquivos recém-editados via Edit ficaram corrompidos **na visão da montagem** 
 4. **Commits**: se `git add` falhar por lock órfão, pedir ao usuário para commitar pelo Windows.
 5. Hipótese OneDrive **descartada** (pasta não está em nuvem). Causa: bug na ponte FUSE do Cowork.
 
-## Estado do código
-- `origin/main` = último commit do usuário (API-Sports fallback + remoção do resumo).
-- Commits recentes: API-Sports fallback → `6f1e09f` (#16 filtros) → `8311adf` (free bet fix) → `633c4d7` (settings boxes).
-- **Vercel**: precisa configurar `VITE_API_SPORTS_KEY` em Environment Variables.
+## Estado do código (2026-07-04 — pós limpeza)
+- `origin/main` HEAD em `2edbf6d` ("fix: diferencia cor Anulada (warning/amber) de Pendente; ajusta espacamento BetCard"). 0 ahead/0 behind, working tree sujo (HANDOFF.md + 28 arquivos removidos + format.ts editado).
+- Commits recentes: `2edbf6d` (cor Anulada) ← `930686e` (merge animações) ← `6d48e44` (altura cards + filtro período) ← `851e7e8` (KPIs clicáveis) ← `598cb16` (docs) ← `fe7dc97` (insights).
+- `framer-motion` instalado como dependência.
+- **Vercel**: `VITE_API_SPORTS_KEY` já configurada em Environment Variables (sessão anterior).
+- **Componentes shadcn/ui**: 22 sobreviventes (de 47 originais). Removidos 24 sem uso + 4 do sistema de toast legado. Bundle inicial não medido mas ~80-100KB recuperados em árvore morta.
 
 ## Pendências (tarefas) — em ordem de impacto
-(Consolidado em 2026-07-01 após revisão geral do codebase. #19–#22 vêm da revisão.)
+(Consolidado em 2026-07-04. Inclui backlog exploratório completo.)
+
+### 🔍 BACKLOG EXPLORAÇÃO (2026-07-04) — novos achados
+Itens mapeados durante exploração do codebase para a próxima sessão:
+
+**#25 Conflito de fontes** — `tailwind.config.ts` usa `fontFamily.sans = ['Inter', ...]`, `fontFamily.heading = ['Plus Jakarta Sans', ...]`; `src/index.css` aplica Jakarta global no `html`. Inter nunca é usada — a configuração Tailwind é mentirosa. Ação: alinhar config com real.
+
+**#26 Extrair constantes duplicadas** — `DAY_NAMES` declarado em 3 arquivos (`src/lib/calc.ts`, `src/lib/insights.ts`, `src/pages/Dashboard.tsx`); `CHART_RANGES`/`PRESETS`/`QUICK_RANGES` replicados em `Dashboard.tsx` e `Analytics.tsx`. Ação: consolidar em `src/lib/constants.ts`.
+
+**#32 Tipos não utilizados** — `src/integrations/supabase/types.ts` possui tipos gerados automáticos; alguns podem ser removidos. Ação: revisar.
+
+**#33 Estilo de código: imports não utilizados** — linhas de `import type` e imports de React não utilizados espalhados. Ação: configurar lint rule `unused-imports`.
+
+**#34 Arquivos de documentação antigos** — `UIUX_REVIEW.md` mencionado como não versionado; verificar se `src/App.css` existe ou foi substituído por Tailwind. Ação: auditar.
+
+**#35 Configuração de tema claro inconsistente** — Tema claro usa hue antigo (não 262). Ação: harmonizar ou documentar decisão.
+
+### ✅ #24 Limpeza de componentes UI mortos (FEITO 2026-07-04, aguardando commit)
+24 componentes shadcn/ui sem import removidos + sistema de toast legado (`toast.tsx`, `toaster.tsx`, `use-toast.ts`) que já havia sido substituído por `sonner.tsx`.
+
+### ✅ #27 Animações não utilizadas (FEITO 2026-07-04, já limpas em sessão anterior)
+Nenhum vestígio de `fadeInRight`/`fadeInUpItem` no código. As variantes `stagger` e `fadeUp` em Dashboard.tsx e Bets.tsx são todas usadas.
+
+### ✅ #28 Toast: sonner é o ativo (FEITO 2026-07-04, aguardando commit)
+`sonner.tsx` é importado em `App.tsx` e usado como `<Sonner>`. Sistema legado (`toast.tsx`, `toaster.tsx`, `use-toast.ts` em ambos os locais) removido. `react-hot-toast` não é mais importado por nenhum arquivo (pode ser removido do `package.json`).
+
+### ✅ #29 Funções não usadas removidas (FEITO 2026-07-04, aguardando commit)
+`formatOdds()` e `signClass()` removidos de `src/lib/format.ts`.
+
+### ✅ #30 `formatPercent` corrigido (FEITO 2026-07-04, aguardando commit)
+Template literal no-op `${v >= 0 ? "" : ""}` removido.
+
+### ✅ #31 Componentes confirmados e removidos (FEITO 2026-07-04, aguardando commit)
+`pagination.tsx` (não usado — app tem `BetsPagination` próprio), `popover.tsx` (confirmado: usado sim, via `Command`). Ambos corretamente tratados — popover mantido, pagination removido.
 
 ### ✅ P0 — integridade de dados (FEITO 2026-07-01, aguardando commit)
 - **#19 RESOLVIDO**: 4 RPCs transacionais criadas (`replace_bet_legs`, `update_bet_with_legs`, `bulk_settle_bets`, `create_bets_with_legs`), todas SECURITY INVOKER + revalidação de posse via `auth.uid()`. Migration `20260701150000_atomic_bet_write_rpcs.sql` (aplicada no remoto via MCP e salva no repo). `useBets.ts` migrado para `rpc()`; smoke test no banco confirmou atomicidade (rollback de lote com id inválido). **Bônus**: corrigido bug de freebet no `handleBulkStatus` (Bets.tsx) — não passava `is_free_bet`, liquidação em lote de freebet perdida calculava `-stake` em vez de 0. **#21 também resolvido**: `useDeleteBet` filtra `user_id`; `useUpdateBet` valida posse na RPC.
