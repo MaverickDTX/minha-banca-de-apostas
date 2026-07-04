@@ -130,8 +130,6 @@ Arquivos recém-editados via Edit ficaram corrompidos **na visão da montagem** 
 ### 🔍 BACKLOG EXPLORAÇÃO (2026-07-04) — novos achados
 Itens mapeados durante exploração do codebase para a próxima sessão:
 
-**#25 Conflito de fontes** — `tailwind.config.ts` usa `fontFamily.sans = ['Inter', ...]`, `fontFamily.heading = ['Plus Jakarta Sans', ...]`; `src/index.css` aplica Jakarta global no `html`. Inter nunca é usada — a configuração Tailwind é mentirosa. Ação: alinhar config com real.
-
 **#26 Extrair constantes duplicadas** — `DAY_NAMES` declarado em 3 arquivos (`src/lib/calc.ts`, `src/lib/insights.ts`, `src/pages/Dashboard.tsx`); `CHART_RANGES`/`PRESETS`/`QUICK_RANGES` replicados em `Dashboard.tsx` e `Analytics.tsx`. Ação: consolidar em `src/lib/constants.ts`.
 
 **#32 Tipos não utilizados** — `src/integrations/supabase/types.ts` possui tipos gerados automáticos; alguns podem ser removidos. Ação: revisar.
@@ -142,7 +140,14 @@ Itens mapeados durante exploração do codebase para a próxima sessão:
 
 **#35 Configuração de tema claro inconsistente** — Tema claro usa hue antigo (não 262). Ação: harmonizar ou documentar decisão.
 
-### ✅ #24 Limpeza de componentes UI mortos (FEITO 2026-07-04, aguardando commit)
+### ✅ #25 Conflito de fontes — Plus Jakarta Sans unificado (FEITO 2026-07-04, COMMITADO)
+- `@import url('...Inter...')` removido do `index.css` (Inter carregava +15KB de fonte nunca usada)
+- `html { font-family: 'Inter' }` → `"Plus Jakarta Sans"`
+- `tailwind.config.ts`: `fontFamily.sans` e `mono` agora apontam para PJS, não Inter
+- CSS redundante do `body` e `.font-mono` removido (herdam do `html`)
+- Efeito: zero flash de fonte (1 única família carregada), ~15KB a menos de CSS/network
+
+### ✅ #24 Limpeza de componentes UI mortos (FEITO 2026-07-04, COMMITADO)
 24 componentes shadcn/ui sem import removidos + sistema de toast legado (`toast.tsx`, `toaster.tsx`, `use-toast.ts`) que já havia sido substituído por `sonner.tsx`.
 
 ### ✅ #27 Animações não utilizadas (FEITO 2026-07-04, já limpas em sessão anterior)
