@@ -81,7 +81,7 @@ export function StatCard({
       <Link
         to={to}
         className={cn(
-          "group block rounded-lg outline-none cursor-pointer",
+          "group block h-full rounded-lg outline-none cursor-pointer",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
           "motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.95]",
