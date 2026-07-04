@@ -3,21 +3,22 @@
 Data: 2026-07-03 (última atualização; histórico abaixo)
 
 ## ➡️ PRÓXIMA TAREFA: a definir
-Candidatos do backlog: KPIs clicáveis (drill-down p/ Análises filtradas — era o "se sobrar espaço" da sessão dos insights), #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão da key API-Sports), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo).
+Candidatos do backlog: KPIs clicáveis (drill-down p/ Análises filtradas — era o "se sobrar espaço" da sessão dos insights, e o follow-on natural), #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão da key API-Sports), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo).
 
-## ✅ Insights automáticos — FEITO (2026-07-03, aguardando commit)
+## ✅ Insights automáticos — FEITO E COMMITADO (2026-07-03)
+- **Commit `fe7dc97`** ("feat: insights automaticos no Dashboard (7 regras puras + 24 testes)"), já em `origin/main` (HEAD == origin/main, 0 ahead/0 behind). Working tree limpo (só `UIUX_REVIEW.md` untracked, intencional).
 - **`src/lib/insights.ts`** (novo): 7 regras puras sobre `Bet[]` retornando `{ id, severity: "positive"|"warning"|"info", text } | null` — bestMarket, worstMarket, bestBookmaker, redStreak (≥3, alerta tilt), yieldTrend (30d vs 30d anteriores), clvBySport (melhor positivo ou pior negativo), drawdownRecent (janela 30d ≥ 80% do pior histórico). `computeInsights()` agrega e ordena por severidade (warning > positive > info).
 - **Thresholds exportados e documentados**: MIN_GROUP_BETS=10, MIN_WINDOW_BETS=5, MIN_CLV_BETS=10, RED_STREAK_ALERT=3, YIELD_MIN_DELTA_PP=2, DRAWDOWN_RECENT_RATIO=0.8, WINDOW_DAYS=30. Sem rótulos absolutos — comparação só com o próprio histórico. `InsightContext.now` injetável p/ testes determinísticos.
 - **`src/lib/insights.test.ts`** (novo): 24 testes (100 no total do repo, todos verdes).
 - **`Dashboard.tsx`**: card "Insights" entre KPIs secundários e gráficos; até 5 insights; ícone por severidade (AlertTriangle/TrendingUp/Info, sem emoji); card some quando não há insight (dados insuficientes).
 - Verificação canônica executada: tsc OK, vitest 100/100, vite build OK (bundle inicial inalterado, 224 kB).
 
-## Estado atual (fim da sessão 2026-07-02)
-- Tudo commitado e deployado até `1a1395f` + 1 commit pendente do usuário ("fix: quick actions como toolbar flutuante").
+## Estado atual (fim da sessão 2026-07-03)
+- Tudo commitado e pushado até `fe7dc97` (insights automáticos). Antes: `e597314` (quick actions toolbar flutuante) e `1a1395f`. Nada pendente de commit.
 - **UI/UX rodada 2 COMPLETA**: levas 1 e 2 + 4 fixes de acabamento (metadados quebrando, período vazando, lucro negativo quebrando linha, toolbar flutuante).
 - Identidade final: tema roxo profundo (hue 262) + Plus Jakarta Sans global + favicon/logo CircleDollarSign.
 - Performance: #22 feito (bundle 224 kB, -82%).
-- Backlog restante: **insights automáticos (próxima)**, #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão do usuário sobre a key API-Sports: pessoal vs público), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo).
+- Backlog restante: **KPIs clicáveis (drill-down p/ Análises — próxima natural)**, #15b apagar conta (Edge Function), #A multi-esporte (aguarda decisão do usuário sobre a key API-Sports: pessoal vs público), #17 dashboard customizável, miúdos (ícone do esporte no card, focus states, tema claro no hue antigo). ~~insights automáticos~~ ✅ FEITO (`fe7dc97`).
 - FUSE: 7 manifestações documentadas. Fluxo seguro inalterado: Edit/Write confiáveis; leituras da montagem de arquivos editados na sessão NÃO confiáveis; verificação = git archive HEAD → /tmp + replay dos patches via python + tsc/vitest/build; processos em background não sobrevivem entre chamadas bash; commits sempre pelo terminal do usuário.
 
 ---
