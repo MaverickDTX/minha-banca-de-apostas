@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useBets, useDeleteBet, useUpdateBet, useBulkUpdateBets, type Bet, type BetInput } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,16 @@ import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.03, delayChildren: 0.05 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+};
 
 const ODDS_BUCKETS: { value: string; label: string; test: (odds: number) => boolean }[] = [
   { value: "lt15", label: "< 1.50", test: (o) => o < 1.5 },
@@ -397,7 +408,7 @@ export default function Bets() {
         <div className="space-y-6">
           {/* grid-cols-1 explícito: a coluna implícita usa piso min-content e as
               linhas nowrap (truncate) dos cards estouravam a tela no mobile. */}
-          <div className={view === "compact" ? "grid gap-2 grid-cols-1" : "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}>
+          <motion.div variants={stagger} initial="hidden" animate="visible" className={view === "compact" ? "grid gap-2 grid-cols-1" : "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}>
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="surface p-4 space-y-3">
@@ -416,17 +427,18 @@ export default function Bets() {
               <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Nenhuma aposta encontrada.</div>
             )}
             {isLoading ? null : paginated.map((b) => (
-              <BetCard
-                key={b.id}
-                compact={view === "compact"}
-                bet={b}
-                currency={currency}
-                unitValue={profile?.unit_value}
-                onStatus={setStatusQuick}
-                onDelete={setToDelete}
-              />
+              <motion.div key={b.id} variants={fadeUp}>
+                <BetCard
+                  compact={view === "compact"}
+                  bet={b}
+                  currency={currency}
+                  unitValue={profile?.unit_value}
+                  onStatus={setStatusQuick}
+                  onDelete={setToDelete}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
           <BetsPagination page={page} totalPages={totalPages} onGoTo={goToPage} />
         </div>
       ) : (

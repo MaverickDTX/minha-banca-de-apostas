@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useBets } from "@/hooks/useBets";
@@ -26,7 +26,14 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
 
+const CHART_RANGES = [
+  { days: 30, label: "30d" },
+  { days: 90, label: "90d" },
+  { days: null, label: "Tudo" },
+] as const;
+
 export default function Dashboard() {
+  const [chartDays, setChartDays] = useState<number | null>(90);
   useEffect(() => { document.title = "Dashboard · Bankroll Pro"; }, []);
   const navigate = useNavigate();
   const { data: bets = [], isLoading } = useBets();
@@ -34,6 +41,13 @@ export default function Dashboard() {
   const { data: profile } = useProfile();
   const currency = profile?.currency ?? "BRL";
   const monthRange = useMemo(() => currentMonthRange(), []);
+  const chartCutoff = useMemo(() => {
+    if (chartDays == null) return null;
+    const d = new Date();
+    d.setDate(d.getDate() - chartDays);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [chartDays]);
 
   const metrics = useMemo(() => computeMetrics(bets), [bets]);
   const insights = useMemo(() => computeInsights(bets, { currency }).slice(0, 5), [bets, currency]);
@@ -54,17 +68,19 @@ export default function Dashboard() {
       d.setHours(0, 0, 0, 0);
       byDay.set(d.getTime(), cum);
     }
-    const points = Array.from(byDay, ([t, banca]) => ({ t, banca }));
+    const cutoff = chartCutoff?.getTime() ?? -Infinity;
+    const points = Array.from(byDay, ([t, banca]) => ({ t, banca })).filter((p) => p.t >= cutoff);
     if (points.length === 0) {
-      points.push({ t: Date.now(), banca: Number(profile?.initial_bankroll ?? 0) });
+      points.push({ t: Date.now(), banca: cum });
     }
     return points;
-  }, [bets, profile]);
+  }, [bets, profile, chartCutoff]);
 
   const byMonth = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) {
       if (!isSettled(b.status)) continue;
+      if (chartCutoff && new Date(b.bet_date) < chartCutoff) continue;
       const d = new Date(b.bet_date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       m.set(key, (m.get(key) ?? 0) + Number(b.net_profit || 0));
@@ -79,7 +95,7 @@ export default function Dashboard() {
       out.push({ month: key, profit: m.get(key) ?? 0 });
     }
     return out;
-  }, [bets]);
+  }, [bets, chartCutoff]);
 
   const statusBreak = useMemo(() => {
     const m = new Map<string, number>();
@@ -203,6 +219,22 @@ export default function Dashboard() {
           </ul>
         </div>
       )}
+
+      <div className="flex items-center gap-1">
+        {CHART_RANGES.map((r) => (
+          <Button
+            key={r.label}
+            type="button"
+            size="sm"
+            variant={chartDays === r.days ? "default" : "outline"}
+            className="h-7 px-2.5 text-xs"
+            onClick={() => setChartDays(r.days)}
+          >
+            {r.label}
+          </Button>
+        ))}
+        <span className="text-xs text-muted-foreground ml-2">Período dos gráficos</span>
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
         <ChartCard title="Evolução da banca" className="lg:col-span-2">

@@ -30,7 +30,7 @@ export function StatCard({
   const card = (
     <div
       className={cn(
-        "surface p-4 flex flex-col gap-2 relative",
+        "surface p-4 flex flex-col gap-2 relative h-full",
         to &&         "motion-safe:transition-all motion-safe:duration-200 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-primary/30 group-hover:border-primary/10 group-focus-visible:shadow-xl group-focus-visible:ring-2 group-focus-visible:ring-primary/30",
         className,
       )}
