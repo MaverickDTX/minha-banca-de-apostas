@@ -31,7 +31,7 @@ const LEG_STATUS_COLORS: Record<LegStatus, string> = {
   pendente: "bg-muted text-muted-foreground border-border",
   green: "bg-success/15 text-success border-success/30",
   red: "bg-destructive/15 text-destructive border-destructive/30",
-  void: "bg-secondary text-muted-foreground border-border",
+  void: "bg-warning/15 text-warning border-warning/30",
 };
 const LEG_STATUS_LABELS: Record<LegStatus, string> = {
   pendente: "Pendente",
@@ -44,7 +44,7 @@ const STATUS_ACCENT: Record<BetStatus, string> = {
   pendente: "before:bg-muted-foreground/40",
   green: "before:bg-success",
   red: "before:bg-destructive",
-  void: "before:bg-muted-foreground/30",
+  void: "before:bg-warning/50",
   half_green: "before:bg-success/70",
   half_red: "before:bg-destructive/70",
   cashout: "before:bg-accent",
@@ -168,7 +168,7 @@ export function BetCard({
     return (
       <div
         className={cn(
-          "surface group relative pl-3 pr-2 py-2 flex items-center gap-3 transition hover:border-foreground/20",
+          "surface group relative pl-3 pr-2 py-2 flex items-center gap-3 transition hover:border-foreground/20 h-full",
           "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
           STATUS_ACCENT[bet.status],
         )}
@@ -217,7 +217,7 @@ export function BetCard({
   return (
     <div
       className={cn(
-        "surface group relative pl-4 pr-3 py-3 flex flex-col gap-2 transition hover:border-foreground/20",
+        "surface group relative pl-4 pr-3 py-4 flex flex-col gap-3 transition hover:border-foreground/20 h-full",
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
         STATUS_ACCENT[bet.status],
       )}

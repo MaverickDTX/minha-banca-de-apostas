@@ -21,7 +21,7 @@ export const STATUS_COLORS: Record<BetStatus, string> = {
   pendente: "bg-muted text-muted-foreground border-border",
   green: "bg-success/15 text-success border-success/30",
   red: "bg-destructive/15 text-destructive border-destructive/30",
-  void: "bg-secondary text-muted-foreground border-border",
+  void: "bg-warning/15 text-warning border-warning/30",
   half_green: "bg-success/10 text-success border-success/20",
   half_red: "bg-destructive/10 text-destructive border-destructive/20",
   cashout: "bg-accent/15 text-accent border-accent/30",
