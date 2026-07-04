@@ -5,9 +5,10 @@ import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
 import { StatCard } from "@/components/StatCard";
 import { computeBankroll, computeMetrics, groupBy } from "@/lib/metrics";
+import { computeInsights, type InsightSeverity } from "@/lib/insights";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays, AlertTriangle, Info, Lightbulb } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
@@ -20,6 +21,8 @@ export default function Dashboard() {
   const currency = profile?.currency ?? "BRL";
 
   const metrics = useMemo(() => computeMetrics(bets), [bets]);
+  // 5 mais relevantes; computeInsights já ordena por severidade (warning > positive > info).
+  const insights = useMemo(() => computeInsights(bets, { currency }).slice(0, 5), [bets, currency]);
   const bank = useMemo(() => computeBankroll(Number(profile?.initial_bankroll ?? 0), bets, txs), [bets, txs, profile]);
   // ROI = lucro das apostas sobre a banca inicial (crescimento do capital de partida).
   const initialBankroll = Number(profile?.initial_bankroll ?? 0);
@@ -160,6 +163,23 @@ export default function Dashboard() {
         <StatCard label="Resultado do mês" value={formatCurrency(monthProfit, currency)} icon={CalendarDays} hint={monthHint} tone={monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "neutral"} />
       </div>
 
+      {insights.length > 0 && (
+        <div className="surface p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Lightbulb className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Insights</h3>
+          </div>
+          <ul className="space-y-2.5">
+            {insights.map((ins) => (
+              <li key={ins.id} className="flex items-start gap-2.5 text-sm">
+                <InsightIcon severity={ins.severity} />
+                <span className="text-foreground/90">{ins.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-4">
         <ChartCard title="Evolução da banca" className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={260}>
@@ -241,6 +261,12 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function InsightIcon({ severity }: { severity: InsightSeverity }) {
+  if (severity === "warning") return <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />;
+  if (severity === "positive") return <TrendingUp className="h-4 w-4 mt-0.5 shrink-0 text-success" />;
+  return <Info className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />;
 }
 
 function ChartCard({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
