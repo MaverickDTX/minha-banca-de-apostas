@@ -5,7 +5,11 @@ const KEY = "3";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 
 import { translateEventName, translateLeague, translateTeamName, translateQueryToEnglish } from "@/lib/translate";
-import { searchEventsApiSports } from "@/lib/apisports";
+import { searchEventsBySport, hasApiProduct, shouldTryTheSportsDbFirst } from "@/lib/apisportsMulti";
+import { searchF1Races } from "@/lib/apisportsF1";
+import { searchTennisMatches } from "@/lib/tennis";
+import { searchOddsApiEvents, isOddsApiSport } from "@/lib/oddsApi";
+import { searchMmaEvents } from "@/lib/mma";
 
 export type SportEvent = {
   id: string;
@@ -98,6 +102,9 @@ const SPORT_LABELS: Record<string, string> = {
   golf: "Golfe",
   motorsport: "Automobilismo",
   "motor sport": "Automobilismo",
+  "formula 1": "Automobilismo",
+  "formula-1": "Automobilismo",
+  f1: "Automobilismo",
   cricket: "Críquete",
   darts: "Dardos",
   snooker: "Sinuca",
@@ -118,33 +125,46 @@ export function mapSportLabel(strSport: string): string {
  * Combines `searchevents` (event-name match) with `searchteams` + `eventsnext`
  * to also surface games when the user types just a team/country.
  */
-export async function searchEvents(query: string, signal?: AbortSignal): Promise<SportEvent[]> {
+export async function searchEvents(query: string, signal?: AbortSignal, sport?: string): Promise<SportEvent[]> {
   const q = query.trim();
   if (q.length < 3) return [];
 
+  const rawLabel = (sport ?? "").trim().toLowerCase();
+  // sport da UI já vem em PT-BR (ex.: "Automobilismo"). Se for uma chave
+  // conhecida do registry API-Sports, usa direto; senão passa pelo mapSportLabel
+  // para converter de inglês (TheSportsDB) → PT-BR.
+  const label = hasApiProduct(rawLabel) ? rawLabel : mapSportLabel(sport ?? "");
+
+  // Tênis: Matchstat se tiver chave; senão cai no TheSportsDB (cobertura fraca)
+  if (rawLabel === "tênis" && import.meta.env.VITE_TENNIS_RAPIDAPI_KEY) {
+    const tennis = await searchTennisMatches(q, signal);
+    if (tennis.length > 0) return tennis;
+  }
+
+  // MMA: busca por promoção via TheSportsDB (eventsnextleague)
+  if (rawLabel === "mma") return searchMmaEvents(q, signal);
+
+  // F1 primária: rotear direto ao adapter Jolpica
+  if (label === "automobilismo") {
+    return searchEventsBySport(q, signal, label);
+  }
+
   // "Time A x Time B": busca pelo time A e filtra os resultados pelo time B.
-  // As APIs não entendem o confronto inteiro (muito menos em português).
   const matchup = splitMatchup(q);
   const teamPart = matchup ? matchup[0] : q;
 
-  // PT → EN: as APIs indexam nomes em inglês ("Alemanha" não acha "Germany").
   const searchQ = translateQueryToEnglish(teamPart) ?? teamPart;
   const opponentVariants = matchup
     ? [matchup[1], translateQueryToEnglish(matchup[1]) ?? ""].filter(Boolean)
     : null;
 
-  // Cache pela query EFETIVA (pós-tradução): "estados un", "estados uni"...
-  // resolvem todos para "United States" e reutilizam a mesma entrada.
-  const cacheKey = `${normText(searchQ)}|${matchup ? normText(matchup[1]) : ""}`;
+  const cacheKey = `${label}|${normText(searchQ)}|${matchup ? normText(matchup[1]) : ""}`;
   const cached = sportCache.get(cacheKey);
   if (cached) return cached;
 
-  // Distingue "vazio de verdade" de "falha/rate limit": só o primeiro é cacheável.
   let hadError = false;
   const results = new Map<string, SportEvent>();
 
-  // 1) Direct event-name search (só sem confronto — com confronto o nome do
-  //    evento digitado está em PT e nunca casa com o índice EN).
   if (!matchup) {
     try {
       const res = await fetch(`${BASE}/searchevents.php?e=${encodeURIComponent(searchQ)}`, { signal });
@@ -161,10 +181,6 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     } catch { hadError = true; }
   }
 
-  // 2) Team search → next 5 AND last 5 matches for the best team hit.
-  //    "Next" covers upcoming games; "last" covers recently played ones, so
-  //    bets logged after the fact can still be autocompleted.
-  //    Limited to 1 team to stay within TheSportsDB free tier (30 req/min).
   try {
     const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(searchQ)}`, { signal });
     if (res.ok) {
@@ -198,13 +214,36 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     }
   } catch { hadError = true; }
 
+  // F1 como fonte secundária em qualquer esporte (1 request cacheado, filtro client-side)
+  if (label !== "automobilismo") {
+    try {
+      const f1 = await searchF1Races(q, signal, { includeAll: false });
+      for (const ev of f1) if (!results.has(ev.id)) results.set(ev.id, ev);
+    } catch { /* F1 opcional */ }
+  }
+
+  // Tênis como fonte secundária em qualquer esporte (Matchstat, se houver chave)
+  if (rawLabel !== "tênis") {
+    try {
+      const tennis = await searchTennisMatches(q, signal);
+      for (const ev of tennis) if (!results.has(ev.id)) results.set(ev.id, ev);
+    } catch { /* Tênis opcional */ }
+  }
+
+  // The Odds API como fonte secundária para MMA (eventos futuros)
+  if (rawLabel === "mma" && isOddsApiSport(rawLabel)) {
+    try {
+      const odds = await searchOddsApiEvents(q, signal, { includeAll: false });
+      for (const ev of odds) if (!results.has(ev.id)) results.set(ev.id, ev);
+    } catch { /* Odds API opcional */ }
+  }
+
   let list = Array.from(results.values());
   if (opponentVariants) list = list.filter((ev) => matchesOpponent(ev, opponentVariants));
   list = list
     .sort((a, b) => {
       const at = a.date ? Date.parse(a.date) : Infinity;
       const bt = b.date ? Date.parse(b.date) : Infinity;
-      // future first (closest), then past
       const now = Date.now();
       const af = at >= now ? 0 : 1;
       const bf = bt >= now ? 0 : 1;
@@ -213,17 +252,15 @@ export async function searchEvents(query: string, signal?: AbortSignal): Promise
     })
     .slice(0, 15);
 
-  // Fallback: if TheSportsDB returned nothing, try API-Sports (football only).
-  if (list.length === 0) {
+  // Fallback: TheSportsDB vazio → tenta API-Sports (só para esportes sem TSDB)
+  if (list.length === 0 && hasApiProduct(label) && !shouldTryTheSportsDbFirst(label)) {
     try {
-      let fallback = await searchEventsApiSports(searchQ, signal);
+      let fallback = await searchEventsBySport(q, signal, label);
       if (opponentVariants) fallback = fallback.filter((ev) => matchesOpponent(ev, opponentVariants));
       list = fallback.slice(0, 15);
     } catch { hadError = true; }
   }
 
-  // Cacheia não-vazios sempre; vazios só quando não houve falha de rede/rate
-  // limit — um vazio legítimo repetido a cada tecla era o que drenava a quota.
   if (list.length > 0 || !hadError) {
     sportCache.set(cacheKey, list);
   }

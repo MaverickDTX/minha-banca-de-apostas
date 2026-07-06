@@ -41,6 +41,19 @@ const MARKETS_BY_SPORT: Record<string, string[]> = {
     "Games do Jogador",
     "Aces do Jogador",
   ],
+  Automobilismo: [
+    "Vencedor da corrida",
+    "Pódio (Top 3)",
+    "Top 6",
+    "Top 10 (Pontos)",
+    "Pole position",
+    "Volta mais rápida",
+    "Duelo entre pilotos (H2H)",
+    "Primeiro a abandonar (DNF)",
+    "Safety car na corrida",
+    "Vencedor do campeonato",
+    "Vencedor da Sprint",
+  ],
   Basquete: [
     "Vencedor (Moneyline)",
     "Handicap (Spread)",
@@ -54,6 +67,58 @@ const MARKETS_BY_SPORT: Record<string, string[]> = {
     "Cestas de 3 do Jogador",
     "Duplo-duplo",
     "Triplo-duplo",
+  ],
+  MMA: [
+    "Vencedor da luta (Moneyline)",
+    "Método de vitória",
+    "Vitória por KO/TKO",
+    "Vitória por Finalização",
+    "Vitória por Decisão",
+    "Round de encerramento",
+    "Total de rounds (Over/Under)",
+    "A luta vai à distância?",
+    "Handicap de rounds",
+  ],
+  "Futebol Americano": [
+    "Vencedor (Moneyline)",
+    "Handicap (Spread)",
+    "Total de Pontos",
+    "Total de Pontos do Time",
+    "Jardas de Passe do Jogador",
+    "Jardas Corridas do Jogador",
+    "Touchdowns do Jogador",
+    "1º a Pontuar",
+  ],
+  "Vôlei": [
+    "Vencedor da Partida",
+    "Handicap de Sets",
+    "Total de Sets",
+    "Placar de Sets",
+    "Total de Pontos",
+    "Vencedor do Set",
+  ],
+  "Beisebol": [
+    "Vencedor (Moneyline)",
+    "Run Line (Handicap)",
+    "Total de Corridas (Over/Under)",
+    "Total do Time",
+    "Rebatidas do Jogador",
+    "Home Runs do Jogador",
+  ],
+  "Hóquei no Gelo": [
+    "Vencedor (Moneyline)",
+    "Puck Line (Handicap)",
+    "Total de Gols (Over/Under)",
+    "Ambos Marcam",
+    "Gols do Jogador",
+    "Assistências do Jogador",
+  ],
+  "Handebol": [
+    "Resultado Final",
+    "Handicap",
+    "Total de Gols",
+    "Dupla Chance",
+    "Resultado 1º Tempo",
   ],
 };
 
@@ -81,11 +146,30 @@ type MarketType =
   | "1x2" | "dc" | "btts" | "ou" | "ah" | "corners" | "cards"
   | "player" | "scorer"
   | "tennis_winner" | "tennis_games" | "tennis_sets"
-  | "nba_ml" | "nba_spread" | "nba_points" | "nba_player";
+  | "nba_ml" | "nba_spread" | "nba_points" | "nba_player"
+  | "f1_driver" | "f1_h2h" | "f1_yesno"
+  | "mma_winner" | "mma_method" | "mma_rounds" | "mma_yesno";
 
-function detectMarketType(market: string): MarketType {
+function detectMarketType(market: string, sport?: string): MarketType {
   const m = market.toLowerCase().trim();
   if (!m) return "1x2";
+
+  // MMA (antes da heurística genérica para evitar colisões)
+  if (sport === "MMA") {
+    if (m.includes("distancia") || m.includes("distância")) return "mma_yesno";
+    if (m.includes("round") || m.includes("total")) return "mma_rounds";
+    if (m.includes("metodo") || m.includes("método") || m.includes("ko") ||
+        m.includes("nocaute") || m.includes("finaliz") || m.includes("submiss") ||
+        m.includes("decis")) return "mma_method";
+    return "mma_winner";
+  }
+
+  // F1 / Automobilismo (antes da heurística genérica para evitar colisões)
+  if (sport === "Automobilismo") {
+    if (m.includes("duelo") || m.includes("h2h")) return "f1_h2h";
+    if (m.includes("dnf") || m.includes("abandon") || m.includes("safety") || m.includes("car")) return "f1_yesno";
+    return "f1_driver";
+  }
 
   // Basquete
   if (m.includes("rebote") || m.includes("assist") || m.includes("pra") || m.includes("cestas de 3") || m.includes("duplo") || m.includes("triplo")) return "nba_player";
@@ -113,8 +197,9 @@ export function getSelectionSuggestions(
   market: string,
   home?: string,
   away?: string,
+  sport?: string,
 ): SelectionSuggestion[] {
-  const type = detectMarketType(market);
+  const type = detectMarketType(market, sport);
   const H = home ?? "Mandante";
   const A = away ?? "Visitante";
   const out: SelectionSuggestion[] = [];
@@ -209,6 +294,18 @@ export function getSelectionSuggestions(
         out.push({ label: `Menos de ${l} pontos`, group: "Total de pontos" });
       }
       break;
+    case "f1_driver":
+      // Nomes dos pilotos vêm da API (getF1Drivers); enquanto não carregados, campo é texto livre
+      break;
+    case "f1_h2h":
+      // Template sem pilotos concretos; campo é texto livre
+      break;
+    case "f1_yesno":
+      out.push(
+        { label: "Sim", group: "Sim/Não" },
+        { label: "Não", group: "Sim/Não" },
+      );
+      break;
     case "nba_player":
       for (const l of [9.5, 14.5, 19.5, 24.5]) {
         out.push({ label: `Mais de ${l}`, group: "Props de jogador" });
@@ -216,6 +313,34 @@ export function getSelectionSuggestions(
       out.push(
         { label: "Duplo-duplo - Sim", group: "Props de jogador" },
         { label: "Triplo-duplo - Sim", group: "Props de jogador" },
+      );
+      break;
+    case "mma_winner":
+      out.push(
+        { label: `Vitória do ${H}`, group: "Vencedor" },
+        { label: `Vitória do ${A}`, group: "Vencedor" },
+      );
+      break;
+    case "mma_method":
+      out.push(
+        { label: `${H} por KO/TKO`, group: "Método" },
+        { label: `${H} por Finalização`, group: "Método" },
+        { label: `${H} por Decisão`, group: "Método" },
+        { label: `${A} por KO/TKO`, group: "Método" },
+        { label: `${A} por Finalização`, group: "Método" },
+        { label: `${A} por Decisão`, group: "Método" },
+      );
+      break;
+    case "mma_rounds":
+      for (const l of [1.5, 2.5, 3.5, 4.5]) {
+        out.push({ label: `Mais de ${l} rounds`, group: "Total de rounds" });
+        out.push({ label: `Menos de ${l} rounds`, group: "Total de rounds" });
+      }
+      break;
+    case "mma_yesno":
+      out.push(
+        { label: "Sim (vai à distância)", group: "Sim/Não" },
+        { label: "Não (termina antes)", group: "Sim/Não" },
       );
       break;
   }

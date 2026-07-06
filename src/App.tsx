@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { MotionConfig } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,30 +30,32 @@ const PageFallback = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Sonner richColors position="top-right" />
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<PageFallback />}>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/apostas" element={<Bets />} />
-              <Route path="/apostas/:id" element={<NewBet />} />
-              <Route path="/nova-aposta" element={<NewBet />} />
-              <Route path="/bankroll" element={<Bankroll />} />
-              <Route path="/analises" element={<Analytics />} />
-              <Route path="/calendario" element={<CalendarPage />} />
-              <Route path="/importar" element={<ImportExport />} />
-              <Route path="/configuracoes" element={<SettingsPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          </Suspense>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <MotionConfig reducedMotion="user">
+      <TooltipProvider>
+        <Sonner richColors position="top-right" />
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/apostas" element={<Bets />} />
+                <Route path="/apostas/:id" element={<NewBet />} />
+                <Route path="/nova-aposta" element={<NewBet />} />
+                <Route path="/bankroll" element={<Bankroll />} />
+                <Route path="/analises" element={<Analytics />} />
+                <Route path="/calendario" element={<CalendarPage />} />
+                <Route path="/importar" element={<ImportExport />} />
+                <Route path="/configuracoes" element={<SettingsPage />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </MotionConfig>
   </QueryClientProvider>
 );
 

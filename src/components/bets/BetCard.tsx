@@ -25,6 +25,7 @@ import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
 import { STATUS_COLORS, STATUS_LABELS, type BetStatus, type LegStatus } from "@/lib/calc";
 import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/format";
 import { useBetLegs, type Bet } from "@/hooks/useBets";
+import { StatusBadgePop } from "@/components/bets/StatusBadgePop";
 import { cn } from "@/lib/utils";
 
 const LEG_STATUS_COLORS: Record<LegStatus, string> = {
@@ -179,9 +180,11 @@ export function BetCard({
             <span className="font-medium truncate">
               {isMultiple ? `Múltipla: ${legs[0]?.event_name || bet.event_name || "—"}` : bet.event_name || "—"}
             </span>
-            <Badge variant="outline" className={cn("text-[10px] uppercase shrink-0", STATUS_COLORS[bet.status])}>
-              {STATUS_LABELS[bet.status]}
-            </Badge>
+            <StatusBadgePop status={bet.status}>
+              <Badge variant="outline" className={cn("text-[10px] uppercase shrink-0", STATUS_COLORS[bet.status])}>
+                {STATUS_LABELS[bet.status]}
+              </Badge>
+            </StatusBadgePop>
           </div>
           <div className="text-[11px] text-muted-foreground truncate">
             {bet.bookmaker || "—"}
@@ -227,9 +230,11 @@ export function BetCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold truncate">{bet.bookmaker || "Sem casa"}</span>
-            <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide", STATUS_COLORS[bet.status])}>
-              {STATUS_LABELS[bet.status]}
-            </Badge>
+            <StatusBadgePop status={bet.status}>
+              <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide", STATUS_COLORS[bet.status])}>
+                {STATUS_LABELS[bet.status]}
+              </Badge>
+            </StatusBadgePop>
           </div>
           <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2 mt-0.5">
             {bet.sport && <span>{bet.sport}</span>}

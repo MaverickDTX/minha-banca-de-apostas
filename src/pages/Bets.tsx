@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { DUR } from "@/lib/motion";
+import { StatusBadgePop } from "@/components/bets/StatusBadgePop";
 import { useBets, useDeleteBet, useUpdateBet, useBulkUpdateBets, type Bet, type BetInput } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
@@ -22,16 +24,6 @@ import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
-
-const stagger = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.03, delayChildren: 0.05 } },
-};
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-};
 
 const ODDS_BUCKETS: { value: string; label: string; test: (odds: number) => boolean }[] = [
   { value: "lt15", label: "< 1.50", test: (o) => o < 1.5 },
@@ -408,7 +400,7 @@ export default function Bets() {
         <div className="space-y-6">
           {/* grid-cols-1 explícito: a coluna implícita usa piso min-content e as
               linhas nowrap (truncate) dos cards estouravam a tela no mobile. */}
-          <motion.div variants={stagger} initial="hidden" animate="visible" className={view === "compact" ? "grid gap-2 grid-cols-1" : "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: DUR.state }} className={view === "compact" ? "grid gap-2 grid-cols-1" : "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}>
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="surface p-4 space-y-3">
@@ -427,7 +419,7 @@ export default function Bets() {
               <div className="surface p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">Nenhuma aposta encontrada.</div>
             )}
             {isLoading ? null : paginated.map((b) => (
-              <motion.div key={b.id} variants={fadeUp}>
+              <div key={b.id}>
                 <BetCard
                   compact={view === "compact"}
                   bet={b}
@@ -436,7 +428,7 @@ export default function Bets() {
                   onStatus={setStatusQuick}
                   onDelete={setToDelete}
                 />
-              </motion.div>
+              </div>
             ))}
           </motion.div>
           <BetsPagination page={page} totalPages={totalPages} onGoTo={goToPage} />
@@ -524,7 +516,9 @@ export default function Bets() {
                 <TableCell className="text-right font-mono">{formatNumber(Number(b.odds), 2)}</TableCell>
                 <TableCell className="text-right font-mono">{formatCurrency(Number(b.stake_amount), currency)}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
+                  <StatusBadgePop status={b.status}>
+                    <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
+                  </StatusBadgePop>
                 </TableCell>
                 {/* whitespace-nowrap: o navegador quebra linha após o "-" de valores negativos. */}
                 <TableCell className={`text-right font-mono whitespace-nowrap ${Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : ""}`}>

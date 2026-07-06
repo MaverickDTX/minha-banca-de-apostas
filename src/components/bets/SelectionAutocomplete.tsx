@@ -10,6 +10,7 @@ export function SelectionAutocomplete({
   homeTeam,
   awayTeam,
   placeholder,
+  sport,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -17,6 +18,7 @@ export function SelectionAutocomplete({
   homeTeam?: string;
   awayTeam?: string;
   placeholder?: string;
+  sport?: string;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
@@ -30,8 +32,8 @@ export function SelectionAutocomplete({
   }, [market]);
 
   const suggestions = useMemo(
-    () => getSelectionSuggestions(market, homeTeam, awayTeam),
-    [market, homeTeam, awayTeam],
+    () => getSelectionSuggestions(market, homeTeam, awayTeam, sport),
+    [market, homeTeam, awayTeam, sport],
   );
 
   const filtered = useMemo(() => {
@@ -89,7 +91,7 @@ export function SelectionAutocomplete({
                       onChange(s.label);
                       setOpen(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 focus:bg-muted/60 outline-none"
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 focus:bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                   >
                     {s.label}
                   </button>

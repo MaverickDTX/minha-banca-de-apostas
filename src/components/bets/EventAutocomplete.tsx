@@ -18,18 +18,25 @@ export function EventAutocomplete({
   onChange,
   onPick,
   placeholder,
+  sport,
 }: {
   value: string;
   onChange: (v: string) => void;
   onPick: (p: Pick) => void;
   placeholder?: string;
+  sport?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SportEvent[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  const justPickedRef = useRef(false);
 
   useEffect(() => {
+    if (justPickedRef.current) {
+      justPickedRef.current = false;
+      return;
+    }
     const q = value.trim();
     // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
     // útil e cada disparo custa até 6 requests somando as duas APIs.
@@ -40,7 +47,7 @@ export function EventAutocomplete({
       abortRef.current = ctrl;
       setLoading(true);
       try {
-        const list = await searchEvents(q, ctrl.signal);
+        const list = await searchEvents(q, ctrl.signal, sport);
         if (!ctrl.signal.aborted) {
           setResults(list);
           setOpen(true);
@@ -50,9 +57,11 @@ export function EventAutocomplete({
       }
     }, 500);
     return () => clearTimeout(handle);
-  }, [value]);
+  }, [value, sport]);
 
   function pick(ev: SportEvent) {
+    justPickedRef.current = true;
+    abortRef.current?.abort();
     onPick({
       name: ev.name,
       isoDate: ev.date,
@@ -94,7 +103,7 @@ export function EventAutocomplete({
                 <button
                   type="button"
                   onClick={() => pick(ev)}
-                  className="w-full text-left px-3 py-2 hover:bg-muted/60 focus:bg-muted/60 outline-none"
+                  className="w-full text-left px-3 py-2 hover:bg-muted/60 focus:bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm truncate">{ev.name}</span>

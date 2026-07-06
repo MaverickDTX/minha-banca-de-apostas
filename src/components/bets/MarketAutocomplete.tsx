@@ -57,7 +57,7 @@ export function MarketAutocomplete({
                     onChange(m);
                     setOpen(false);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 focus:bg-muted/60 outline-none"
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 focus:bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
                   {m}
                 </button>

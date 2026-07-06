@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import { useBets } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { computeMetrics, groupBy, oddsBucket } from "@/lib/metrics";
+import { DUR } from "@/lib/motion";
+import { CountUp } from "@/components/CountUp";
 import {
   analyticsTabLabel,
   betMatchesGroup,
@@ -36,6 +39,7 @@ const PRESETS = [
 ];
 
 export default function Analytics() {
+  const reduce = useReducedMotion();
   useEffect(() => { document.title = "Análises · Bankroll Pro"; }, []);
   const { data: bets = [] } = useBets();
   const { data: profile } = useProfile();
@@ -205,20 +209,20 @@ export default function Analytics() {
           </Badge>
         )}
         <div className="ml-auto text-xs text-muted-foreground">
-          {m.totalBets} apostas · Lucro{" "}
+          <CountUp value={m.totalBets} format={(n) => formatNumber(n, 0)} /> apostas · Lucro{" "}
           <span className={m.netProfit >= 0 ? "positive font-mono" : "negative font-mono"}>
-            {formatCurrency(m.netProfit, currency)}
+            <CountUp value={m.netProfit} format={(n) => formatCurrency(n, currency)} />
           </span>{" "}
-          · Yield <span className="font-mono">{formatPercent(m.yield)}</span>
+          · Yield <span className="font-mono"><CountUp value={m.yield} format={(n) => formatPercent(n)} /></span>
         </div>
       </div>
 
-      <div
+      <motion.div
         key={contentKey}
-        className={cn(
-          "space-y-4",
-          hasDeepLink && "animate-in fade-in duration-300 motion-reduce:animate-none",
-        )}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: DUR.state }}
+        className="space-y-4"
       >
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="surface p-4 lg:col-span-2">
@@ -245,8 +249,8 @@ export default function Analytics() {
                   formatter={(v: number) => formatCurrency(v, currency)}
                   labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
                 />
-                <Line type="monotone" dataKey="lucro" name="Lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="drawdown" name="Drawdown" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} />
+                <Line isAnimationActive={!reduce} type="monotone" dataKey="lucro" name="Lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                <Line isAnimationActive={!reduce} type="monotone" dataKey="drawdown" name="Drawdown" stroke="hsl(var(--destructive))" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -263,7 +267,7 @@ export default function Analytics() {
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                   cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }}
                 />
-                <Bar dataKey="n" name="Apostas" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={!reduce} dataKey="n" name="Apostas" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -280,7 +284,7 @@ export default function Analytics() {
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                   formatter={(v: number) => formatCurrency(v, currency)}
                 />
-                <Scatter data={scatter}>
+                <Scatter isAnimationActive={!reduce} data={scatter}>
                   {scatter.map((p, i) => (
                     <Cell key={i} fill={p.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
                   ))}
@@ -324,7 +328,7 @@ export default function Analytics() {
           <TabsContent value="timing"><GroupTable rows={byTiming} currency={currency} highlightKey={group} /></TabsContent>
           <TabsContent value="tipo"><GroupTable rows={byType} currency={currency} highlightKey={group} /></TabsContent>
         </Tabs>
-      </div>
+      </motion.div>
     </div>
   );
 }

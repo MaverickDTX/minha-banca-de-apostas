@@ -24,7 +24,7 @@ import { MarketAutocomplete } from "@/components/bets/MarketAutocomplete";
 import { TipsterAutocomplete } from "@/components/bets/TipsterAutocomplete";
 import { LegsEditor, type EditableLeg } from "@/components/bets/LegsEditor";
 
-const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
+const SPORTS = ["Futebol", "Basquete", "Vôlei", "Futebol Americano", "Beisebol", "Hóquei no Gelo", "Handebol", "Tênis", "MMA", "eSports", "Automobilismo", "Outro"];
 const BET_TYPES = [
   { v: "simples", l: "Simples" },
   { v: "multipla", l: "Múltipla" },
@@ -301,6 +301,7 @@ export function BetForm({
                     onChange={setEventName}
                     onPick={applyEventPick}
                     placeholder="Ex: Uruguai ou Brasil x Argentina"
+                    sport={sport}
                   />
                 </Field>
 
@@ -314,6 +315,7 @@ export function BetForm({
                     market={market}
                     homeTeam={homeTeam}
                     awayTeam={awayTeam}
+                    sport={sport}
                   />
                 </Field>
                 <Field label="Odd">
@@ -436,6 +438,7 @@ export function BetForm({
                     value={event_name}
                     onChange={setEventName}
                     onPick={applyEventPick}
+                    sport={sport}
                   />
                 </Field>
                 <Field label="Mercado">
@@ -448,6 +451,7 @@ export function BetForm({
                     market={market}
                     homeTeam={homeTeam}
                     awayTeam={awayTeam}
+                    sport={sport}
                   />
                 </Field>
                 <Field label="Odd apostada">

@@ -25,7 +25,7 @@ export type EditableLeg = {
   tipster: string;
 };
 
-const SPORTS = ["Futebol", "Basquete", "Tênis", "MMA", "eSports", "NFL", "Vôlei", "Outro"];
+const SPORTS = ["Futebol", "Basquete", "Vôlei", "Futebol Americano", "Beisebol", "Hóquei no Gelo", "Handebol", "Tênis", "MMA", "eSports", "Automobilismo", "Outro"];
 const LEG_STATUS: { v: LegStatus; l: string }[] = [
   { v: "pendente", l: "Pendente" },
   { v: "green", l: "Ganha" },
@@ -164,6 +164,7 @@ export function LegsEditor({
                     away_team: p.awayTeam,
                   });
                 }}
+                sport={leg.sport}
               />
             </LegField>
             <LegField label="Data do evento">
@@ -184,6 +185,7 @@ export function LegsEditor({
                 market={leg.market}
                 homeTeam={leg.home_team}
                 awayTeam={leg.away_team}
+                sport={leg.sport}
               />
             </LegField>
 

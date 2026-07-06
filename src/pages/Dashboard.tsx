@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { useBets } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
@@ -15,15 +15,17 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianG
 import { Skeleton } from "@/components/ui/skeleton";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 import { cn } from "@/lib/utils";
+import { CountUp } from "@/components/CountUp";
+import { DUR, EASE, RISE, STAGGER } from "@/lib/motion";
 
-const stagger = {
+const stagger: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.1 } },
 };
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: RISE },
+  visible: { opacity: 1, y: 0, transition: { duration: DUR.reveal, ease: EASE.out } },
 };
 
 const CHART_RANGES = [
@@ -177,10 +179,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <motion.div variants={fadeUp}><StatCard size="lg" label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} to="/bankroll" /></motion.div>
-          <motion.div variants={fadeUp}><StatCard size="lg" label="Lucro / prejuízo" value={formatCurrency(metrics.netProfit, currency)} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
-          <motion.div variants={fadeUp}><StatCard size="lg" label="ROI" value={formatPercent(roi)} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
-          <motion.div variants={fadeUp}><StatCard size="lg" label="Yield" value={formatPercent(metrics.yield)} icon={Activity} info="Lucro dividido pelo total apostado (turnover). Mede a eficiência por real arriscado — 5%+ sustentado é forte." tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ tab: "mercado" })} /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="Banca atual" value={<CountUp value={bank.current} format={(n) => formatCurrency(n, currency)} />} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} to="/bankroll" /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="Lucro / prejuízo" value={<CountUp value={metrics.netProfit} format={(n) => formatCurrency(n, currency)} />} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="ROI" value={<CountUp value={roi} format={(n) => formatPercent(n)} />} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="Yield" value={<CountUp value={metrics.yield} format={(n) => formatPercent(n)} />} icon={Activity} info="Lucro dividido pelo total apostado (turnover). Mede a eficiência por real arriscado — 5%+ sustentado é forte." tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ tab: "mercado" })} /></motion.div>
         </motion.div>
       )}
 

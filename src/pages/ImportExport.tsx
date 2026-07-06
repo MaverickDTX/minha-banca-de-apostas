@@ -76,6 +76,7 @@ function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): any[] {
   const result: any[] = [];
   let currentGroup: {
     bet_date: string;
+    stake_amount: string;
     event_date?: string;
     sport?: string;
     league?: string;
