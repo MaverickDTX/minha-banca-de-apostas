@@ -184,7 +184,7 @@ export default function Analytics() {
           className="w-[160px]"
         />
         <Select value={status} onValueChange={(v) => patchParams({ status: v === "all" ? null : v })}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-auto min-w-[150px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos status</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, l]) => (

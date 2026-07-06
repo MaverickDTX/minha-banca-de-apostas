@@ -91,7 +91,7 @@ export function useBets() {
     queryKey: ["bets", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Bet[]> => {
-      let allData: any[] = [];
+      let allData: Bet[] = [];
       let from = 0;
       const step = 1000;
       let hasMore = true;
@@ -107,7 +107,7 @@ export function useBets() {
         if (error) throw error;
         
         if (data && data.length > 0) {
-          allData = [...allData, ...data];
+          allData = [...allData, ...(data as Bet[])];
           from += step;
           if (data.length < step) {
             hasMore = false;
@@ -220,9 +220,9 @@ export function useCreateBet() {
       if (!id) throw new Error("Falha ao criar aposta");
       return id;
     },
-    onSuccess: (id) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
-      qc.invalidateQueries({ queryKey: ["bet_legs", id] });
+      qc.invalidateQueries({ queryKey: ["bet_legs"] });
     },
   });
 }
@@ -243,8 +243,27 @@ export function useUpdateBet() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["bets", user?.id] });
-      qc.invalidateQueries({ queryKey: ["bet_legs", vars.id] });
+      qc.invalidateQueries({ queryKey: ["bet_legs"] });
       qc.invalidateQueries({ queryKey: ["bet", vars.id] });
+    },
+  });
+}
+
+/** Contagem de pernas por bet_id, em lote (uma query para a página visível). */
+export function useBetLegCounts(betIds: string[]) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["bet_legs", "counts", user?.id, [...betIds].sort().join(",")],
+    enabled: !!user && betIds.length > 0,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase
+        .from("bet_legs")
+        .select("bet_id")
+        .in("bet_id", betIds);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) counts[row.bet_id] = (counts[row.bet_id] ?? 0) + 1;
+      return counts;
     },
   });
 }

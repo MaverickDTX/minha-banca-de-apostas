@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useBets, useCreateBet, useBulkCreateBets, type BetInput, type BetLegInput } from "@/hooks/useBets";
+import { useBets, useCreateBet, useBulkCreateBets, type Bet, type BetInput, type BetLegInput } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
@@ -72,8 +72,27 @@ type Preview = {
   legsCount?: number;
 };
 
-function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): any[] {
-  const result: any[] = [];
+/** Perna crua vinda de CSV/JSON — tudo string até a validação. */
+type RawLeg = {
+  order_index?: number;
+  sport?: string; league?: string; event_name?: string;
+  home_team?: string; away_team?: string; event_date?: string;
+  market?: string; selection?: string;
+  odds?: string; status?: string; tipster?: string;
+};
+
+/** Aposta crua vinda de CSV/JSON, antes de virar BetInput. */
+type RawBet = {
+  bet_date?: string; event_date?: string; sport?: string; league?: string;
+  event_name?: string; market?: string; selection?: string; bookmaker?: string;
+  bet_type?: string; timing?: string; odds?: string; closing_odds?: string;
+  stake_amount?: string; status?: string; estimated_probability?: string;
+  tipster?: string; tags?: string | string[]; notes?: string;
+  legs?: string | RawLeg[];
+};
+
+function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): RawBet[] {
+  const result: RawBet[] = [];
   let currentGroup: {
     bet_date: string;
     stake_amount: string;
@@ -91,7 +110,7 @@ function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): any[] {
     tipster?: string;
     tags?: string;
     notes?: string;
-    legs: any[];
+    legs: RawLeg[];
   } | null = null;
 
   for (const row of rows) {
@@ -156,7 +175,7 @@ function groupConsecutiveCsvMultiples(rows: Record<string, string>[]): any[] {
   return result;
 }
 
-function isDuplicate(parsed: BetInput, existingBets: any[]): boolean {
+function isDuplicate(parsed: BetInput, existingBets: Bet[]): boolean {
   return existingBets.some((b) => {
     if (b.bet_type !== parsed.bet_type) return false;
     if (b.bookmaker !== parsed.bookmaker) return false;
@@ -182,7 +201,7 @@ export default function ImportExport() {
   const [preview, setPreview] = useState<Preview[]>([]);
   const [busy, setBusy] = useState(false);
 
-  function validateBet(bet: any, existingBets: any[]): Preview {
+  function validateBet(bet: RawBet, existingBets: Bet[]): Preview {
     const errors: string[] = [];
     const isMultiple = (bet.bet_type || "").toLowerCase() === "multipla" || (bet.bet_type || "").toLowerCase() === "múltipla";
     const stake = parseFloat(bet.stake_amount);
@@ -200,12 +219,12 @@ export default function ImportExport() {
     let parsedLegs: BetLegInput[] | undefined = undefined;
 
     if (isMultiple) {
-      let legs: any[] = [];
+      let legs: RawLeg[] = [];
       if (Array.isArray(bet.legs)) {
         legs = bet.legs;
       } else if (typeof bet.legs === "string" && bet.legs.trim()) {
         try {
-          legs = JSON.parse(bet.legs);
+          legs = JSON.parse(bet.legs) as RawLeg[];
         } catch (e) {
           errors.push("legs JSON inválido");
         }
@@ -215,7 +234,7 @@ export default function ImportExport() {
         errors.push("múltipla precisa de pelo menos 2 pernas");
       }
 
-      parsedLegs = legs.map((l: any, idx: number) => {
+      parsedLegs = legs.map((l, idx) => {
         const legOdds = parseFloat(l.odds);
         if (isNaN(legOdds) || legOdds <= 1) {
           errors.push(`perna ${idx + 1}: odd inválida`);
@@ -335,11 +354,11 @@ export default function ImportExport() {
             toast.error("O arquivo JSON deve conter uma lista de apostas.");
             return;
           }
-          setPreview(data.map((b: any) => validateBet(b, bets)));
+          setPreview((data as RawBet[]).map((b) => validateBet(b, bets)));
         } else {
           const rows = parseCsv(txt);
           const grouped = groupConsecutiveCsvMultiples(rows);
-          setPreview(grouped.map((b: any) => validateBet(b, bets)));
+          setPreview(grouped.map((b) => validateBet(b, bets)));
         }
       } catch (err) {
         toast.error("Erro ao processar o arquivo. Verifique o formato.");

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { DUR } from "@/lib/motion";
 import { StatusBadgePop } from "@/components/bets/StatusBadgePop";
-import { useBets, useDeleteBet, useUpdateBet, useBulkUpdateBets, type Bet, type BetInput } from "@/hooks/useBets";
+import { useBets, useDeleteBet, useUpdateBet, useBulkUpdateBets, useBetLegCounts, type Bet, type BetInput } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -217,6 +217,12 @@ export default function Bets() {
     return sorted.slice(start, start + pageSize);
   }, [sorted, page, pageSize]);
 
+  const multiIds = useMemo(
+    () => paginated.filter((b) => b.bet_type === "multipla").map((b) => b.id),
+    [paginated],
+  );
+  const { data: legCounts = {} } = useBetLegCounts(multiIds);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   function goToPage(n: number) {
     const target = Math.min(Math.max(1, n), totalPages);
@@ -278,21 +284,21 @@ export default function Bets() {
           ))}
         </div>
         <Select value={status} onValueChange={updateParam.bind(null, "status")}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-auto min-w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos status</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={sport} onValueChange={updateParam.bind(null, "sport")}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Esporte" /></SelectTrigger>
+          <SelectTrigger className="w-auto min-w-[140px]"><SelectValue placeholder="Esporte" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos esportes</SelectItem>
             {sports.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={bookmaker} onValueChange={updateParam.bind(null, "bookmaker")}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Casa" /></SelectTrigger>
+          <SelectTrigger className="w-auto min-w-[140px]"><SelectValue placeholder="Casa" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas casas</SelectItem>
             {books.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -499,7 +505,11 @@ export default function Bets() {
                 </TableCell>
                 <TableCell>
                   {b.bet_type === "multipla" ? (
-                    <div className="text-xs text-muted-foreground">Múltipla · pernas em Editar</div>
+                    <div className="text-xs text-muted-foreground">
+                      {legCounts[b.id]
+                        ? `Múltipla · ${legCounts[b.id]} perna${legCounts[b.id] > 1 ? "s" : ""}`
+                        : "Múltipla"}
+                    </div>
                   ) : (
                     <>
                       <div className="text-sm">{b.market || "—"}</div>
