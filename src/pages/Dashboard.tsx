@@ -37,6 +37,22 @@ const CHART_RANGES = [
 export default function Dashboard() {
   const [chartDays, setChartDays] = useState<number | null>(90);
   useEffect(() => { document.title = "Dashboard · Bankroll Pro"; }, []);
+  useEffect(() => {
+    let touchedChart: Element | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      const wrapper = (e.target as HTMLElement)?.closest?.(".recharts-wrapper");
+      if (wrapper) {
+        touchedChart = wrapper;
+      } else if (touchedChart) {
+        touchedChart.querySelectorAll<SVGElement>("svg.recharts-surface").forEach((svg) => {
+          svg.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+        });
+        touchedChart = null;
+      }
+    };
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    return () => document.removeEventListener("touchstart", onTouchStart);
+  }, []);
   const navigate = useNavigate();
   const { data: bets = [], isLoading } = useBets();
   const { data: txs = [] } = useTransactions();

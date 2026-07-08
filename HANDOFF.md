@@ -2,9 +2,7 @@
 
 Data: 2026-07-08 (última atualização; histórico abaixo)
 
-## ✅ Sessão 2026-07-08 (2) — Ajuste fino: fontes -1px + bullet separator
-
-Usuário pediu redução de 1px na fonte do evento e troca do separador pipe por bullet centralizado. Após testar, pediu para reduzir as demais fontes do card em 1px também.
+## ✅ Sessão 2026-07-08 (2) — Ajuste fino BetCard + tooltip recharts mobile
 
 ### BetCard — 4ª iteração
 - **Evento**: `text-lg` (18px) → `text-[17px]`.
@@ -12,8 +10,11 @@ Usuário pediu redução de 1px na fonte do evento e troca do separador pipe por
 - **Demais fontes reduzidas em 1px**: seleção (`13px` → `12px`), meta (`text-xs`/12px → `11px`), valores de métricas (`text-sm`/14px → `13px`), rótulos de métricas (`10px` → `9px`), lucro líquido label (`12px` → `11px`), badges (`11px` → `10px`), leg badge (`9px` → `8px`). Compact mode: meta (`11px` → `10px`), valores (`14px` → `13px`).
 - **Meta reposicionada**: movida para dentro do `flex-1 min-w-0` (antes era irmã do row principal, separada por `gap-3`), agora logo abaixo da seleção com `mt-1.5`. O `gap-3` do container agora só separa meta→métricas e métricas→lucro.
 
+### Tooltip recharts — dismiss inteligente em mobile (Dashboard + Análises)
+O fix anterior disparava `mouseleave` em todos os charts em cada `touchend` — corria antes do recharts processar o toque, então o tooltip nunca aparecia. Novo comportamento: "tap no chart → mostra, tap fora → esconde". Um `touchstart` listener rastreia qual chart foi tocado; no toque seguinte fora dele, dispara `mouseleave` só naquele SVG. Comportamento natural de mobile, sem interferir no hover desktop.
+
 ### Estado de commit
-- **Aguardando commit**: BetCard.tsx (fontes -1px geral + bullet `•`) e este HANDOFF.md.
+- **Aguardando commit**: BetCard.tsx, Dashboard.tsx, Analytics.tsx, HANDOFF.md.
 - Verificação: `tsc --noEmit` + `vitest run` (109/109) OK via fluxo canônico off-mount.
 
 ## ✅ Sessão 2026-07-08 — Refinamentos do BetCard iterados com o usuário + confirmação de exclusão em Banca

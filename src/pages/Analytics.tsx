@@ -41,6 +41,22 @@ const PRESETS = [
 export default function Analytics() {
   const reduce = useReducedMotion();
   useEffect(() => { document.title = "Análises · Bankroll Pro"; }, []);
+  useEffect(() => {
+    let touchedChart: Element | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      const wrapper = (e.target as HTMLElement)?.closest?.(".recharts-wrapper");
+      if (wrapper) {
+        touchedChart = wrapper;
+      } else if (touchedChart) {
+        touchedChart.querySelectorAll<SVGElement>("svg.recharts-surface").forEach((svg) => {
+          svg.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+        });
+        touchedChart = null;
+      }
+    };
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    return () => document.removeEventListener("touchstart", onTouchStart);
+  }, []);
   const { data: bets = [] } = useBets();
   const { data: profile } = useProfile();
   const currency = profile?.currency ?? "BRL";
@@ -277,7 +293,7 @@ export default function Analytics() {
               <ScatterChart>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
                 <XAxis type="number" dataKey="stake" name="Stake" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                <YAxis type="number" dataKey="lucro" name="Lucro" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                <YAxis type="number" dataKey="lucro" name="Lucro" stroke="hsl(var(--muted-foreground))" fontSize={11} domain={[(min: number) => min - 10, (max: number) => max + 10]} />
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                   labelStyle={{ color: "hsl(var(--popover-foreground))" }}
@@ -286,7 +302,7 @@ export default function Analytics() {
                 />
                 <Scatter isAnimationActive={!reduce} data={scatter}>
                   {scatter.map((p, i) => (
-                    <Cell key={i} fill={p.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
+                    <Cell key={i} fill={p.lucro >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} fillOpacity={0.55} />
                   ))}
                 </Scatter>
               </ScatterChart>
