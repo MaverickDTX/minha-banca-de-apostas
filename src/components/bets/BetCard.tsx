@@ -180,20 +180,20 @@ export function BetCard({
             <span className="font-medium truncate">
               {isMultiple ? `Múltipla: ${legs[0]?.event_name || bet.event_name || "—"}` : bet.event_name || "—"}
             </span>
-            <StatusBadgePop status={bet.status}>
-              <Badge variant="outline" className={cn("text-[10px] uppercase shrink-0", STATUS_COLORS[bet.status])}>
-                {STATUS_LABELS[bet.status]}
-              </Badge>
-            </StatusBadgePop>
-          </div>
-          <div className="text-[11px] text-muted-foreground truncate">
+                <StatusBadgePop status={bet.status}>
+                  <Badge variant="outline" className={cn("text-[10px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
+                    {STATUS_LABELS[bet.status]}
+                  </Badge>
+                </StatusBadgePop>
+              </div>
+          <div className="text-[10px] text-muted-foreground truncate">
             {bet.bookmaker || "—"}
             {bet.market ? ` | ${bet.market}` : ""}
             {bet.selection ? ` — ${bet.selection}` : ""}
             {" | "}{formatDate(bet.bet_date)}
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-sm">
+        <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-[13px]">
           <span className="text-muted-foreground">@{formatNumber(Number(bet.odds), 2)}</span>
           <span>{formatCurrency(Number(bet.stake_amount), currency)}</span>
           {clv != null && (
@@ -204,7 +204,7 @@ export function BetCard({
         </div>
         <span
           className={cn(
-            "font-mono tabular-nums text-sm font-semibold min-w-[84px] text-right shrink-0",
+            "font-mono tabular-nums text-[13px] font-semibold min-w-[84px] text-right shrink-0",
             net != null && net > 0 && "positive",
             net != null && net < 0 && "negative",
           )}
@@ -238,13 +238,13 @@ export function BetCard({
                 >
                   <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-lg font-semibold leading-tight truncate">
+                    <div className="text-[17px] font-semibold leading-tight truncate">
                       Múltipla: {legs[0]?.event_name || bet.event_name || "—"}
                       {legs.length > 1 && (
                         <span className="text-muted-foreground font-normal"> +{legs.length - 1} jogo{legs.length - 1 > 1 ? "s" : ""}</span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-[11px] text-muted-foreground truncate">
                       {legs.length} perna{legs.length !== 1 ? "s" : ""} | odd total {formatNumber(Number(bet.odds), 3)}
                     </div>
                   </div>
@@ -253,7 +253,7 @@ export function BetCard({
                   )}
                 </button>
                 <StatusBadgePop status={bet.status}>
-                  <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
+                  <Badge variant="outline" className={cn("text-[10px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
                     {STATUS_LABELS[bet.status]}
                   </Badge>
                 </StatusBadgePop>
@@ -261,7 +261,7 @@ export function BetCard({
               {expanded && (
                 <ol className="mt-2 space-y-1.5 border-l border-border/60 pl-3">
                   {legs.map((leg, idx) => (
-                    <li key={leg.id} className="text-xs flex items-start justify-between gap-2">
+                    <li key={leg.id} className="text-[11px] flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate">
                           <span className="text-muted-foreground">{idx + 1}.</span> {leg.event_name || "—"}
@@ -272,7 +272,7 @@ export function BetCard({
                           {" | "}@{formatNumber(Number(leg.odds), 2)}
                         </div>
                       </div>
-                      <Badge variant="outline" className={cn("text-[9px] uppercase shrink-0", LEG_STATUS_COLORS[leg.status])}>
+                      <Badge variant="outline" className={cn("text-[8px] uppercase shrink-0", LEG_STATUS_COLORS[leg.status])}>
                         {LEG_STATUS_LABELS[leg.status]}
                       </Badge>
                     </li>
@@ -285,17 +285,31 @@ export function BetCard({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
-                  <span className="text-lg font-semibold truncate">{bet.event_name || "—"}</span>
+                  <span className="text-[17px] font-semibold truncate">{bet.event_name || "—"}</span>
                 </div>
                 <StatusBadgePop status={bet.status}>
-                  <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
+                  <Badge variant="outline" className={cn("text-[10px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
                     {STATUS_LABELS[bet.status]}
                   </Badge>
                 </StatusBadgePop>
               </div>
-              <div className="text-[13px] text-foreground/80 truncate mt-1.5">
+              <div className="text-[12px] text-foreground/80 truncate mt-1.5">
                 {bet.market || "—"}
                 {bet.selection ? <span> — {bet.selection}</span> : null}
+              </div>
+              <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-1.5 mt-1.5">
+                {[
+                  bet.sport,
+                  bet.league,
+                  TYPE_LABEL[bet.bet_type] ?? bet.bet_type,
+                  TIMING_LABEL[bet.timing] ?? bet.timing,
+                  formatDate(bet.bet_date),
+                ]
+                  .filter((p): p is string => Boolean(p))
+                  .flatMap((part, i) => [
+                    ...(i > 0 ? [<span key={`s${i}`} className="text-muted-foreground">•</span>] : []),
+                    <span key={i}>{part}</span>,
+                  ])}
               </div>
             </>
           )}
@@ -304,21 +318,7 @@ export function BetCard({
         {menu}
       </div>
 
-      <div className="text-xs text-muted-foreground flex flex-wrap gap-x-1.5 items-center">
-        {[
-          bet.sport,
-          bet.league,
-          TYPE_LABEL[bet.bet_type] ?? bet.bet_type,
-          TIMING_LABEL[bet.timing] ?? bet.timing,
-          formatDate(bet.bet_date),
-        ]
-          .filter((p): p is string => Boolean(p))
-          .map((part, i) => (
-            <span key={i}>{i > 0 ? `| ${part}` : part}</span>
-          ))}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-[13px]">
         <Metric label="Odd" value={formatNumber(Number(bet.odds), 2)} mono />
         <Metric
           label="Stake"
@@ -363,7 +363,7 @@ export function BetCard({
       </div>
 
       <div className="flex items-center justify-between border-t border-border/60 pt-2 mt-1">
-        <span className="text-xs text-muted-foreground">Lucro líquido</span>
+        <span className="text-[11px] text-muted-foreground">Lucro líquido</span>
         <span
           className={cn(
             "font-mono font-semibold tabular-nums",
@@ -394,7 +394,7 @@ function Metric({
 }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</span>
       <span
         className={cn(
           strong ? "font-semibold" : "font-medium",

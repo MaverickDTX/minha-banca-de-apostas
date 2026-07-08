@@ -2,6 +2,20 @@
 
 Data: 2026-07-08 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-08 (2) — Ajuste fino: fontes -1px + bullet separator
+
+Usuário pediu redução de 1px na fonte do evento e troca do separador pipe por bullet centralizado. Após testar, pediu para reduzir as demais fontes do card em 1px também.
+
+### BetCard — 4ª iteração
+- **Evento**: `text-lg` (18px) → `text-[17px]`.
+- **Separador da meta**: pipe `|` → bullet `•` como elemento flex separado entre cada parte, centralizado pelo `gap-x-1.5` do container. Pipe mantido no modo compacto (a pedido) e sublinhas de múltipla.
+- **Demais fontes reduzidas em 1px**: seleção (`13px` → `12px`), meta (`text-xs`/12px → `11px`), valores de métricas (`text-sm`/14px → `13px`), rótulos de métricas (`10px` → `9px`), lucro líquido label (`12px` → `11px`), badges (`11px` → `10px`), leg badge (`9px` → `8px`). Compact mode: meta (`11px` → `10px`), valores (`14px` → `13px`).
+- **Meta reposicionada**: movida para dentro do `flex-1 min-w-0` (antes era irmã do row principal, separada por `gap-3`), agora logo abaixo da seleção com `mt-1.5`. O `gap-3` do container agora só separa meta→métricas e métricas→lucro.
+
+### Estado de commit
+- **Aguardando commit**: BetCard.tsx (fontes -1px geral + bullet `•`) e este HANDOFF.md.
+- Verificação: `tsc --noEmit` + `vitest run` (109/109) OK via fluxo canônico off-mount.
+
 ## ✅ Sessão 2026-07-08 — Refinamentos do BetCard iterados com o usuário + confirmação de exclusão em Banca
 
 Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário sobre a rodada de consistência.
@@ -22,9 +36,8 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 - Ação, não destino; CTAs existem no Dashboard e em Apostas. Usuário confundia com a página "Apostas". (Commitado em `1d3c9a1`.)
 
 ### Estado de commit
-- Commitados: sidebar, rodada consolidada, BetCard (logo/meta/quick actions), dialog de transação.
-- **Aguardando commit**: BetCard.tsx (fontes 18/13/14/12px + separador pipe) e este HANDOFF.md.
-- Verificação: `tsc --noEmit` OK via fluxo canônico off-mount. **Nota nova de ambiente**: `vite build` não roda no sandbox (node_modules instalado no Windows → rollup só tem binário win32); validar com tsc/vitest e deixar o build para o Vercel.
+- Commitados: sidebar, rodada consolidada, BetCard (logo/meta/quick actions), dialog de transação, BetCard.tsx (fontes 18/13/14/12px + separador pipe), HANDOFF.md.
+- Verificação: `tsc --noEmit` OK via fluxo canônico off-mount.
 
 ### Backlog atualizado (ordem de relevância)
 1. Tooltip do recharts preso após tap em mobile (Dashboard/Análises) — opcional, registrado na sessão mobile.
