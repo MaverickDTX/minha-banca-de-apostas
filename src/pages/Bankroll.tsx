@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTransactions, useCreateTransaction, useDeleteTransaction, TX_LABELS, type TxType } from "@/hooks/useTransactions";
+import { useTransactions, useCreateTransaction, useDeleteTransaction, TX_LABELS, type TxType, type BankrollTx } from "@/hooks/useTransactions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useBets } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
@@ -23,6 +33,7 @@ export default function BankrollPage() {
   const { data: profile } = useProfile();
   const createTx = useCreateTransaction();
   const deleteTx = useDeleteTransaction();
+  const [txToDelete, setTxToDelete] = useState<BankrollTx | null>(null);
   const currency = profile?.currency ?? "BRL";
 
   const bank = useMemo(() => computeBankroll(Number(profile?.initial_bankroll ?? 0), bets, txs), [bets, txs, profile]);
@@ -105,7 +116,7 @@ export default function BankrollPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
         <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} />
         <StatCard label="Banca inicial" value={formatCurrency(profile?.initial_bankroll ?? 0, currency)} icon={PiggyBank} />
         <StatCard label="Lucro de apostas" value={formatCurrency(bank.betsProfit, currency)} icon={bank.betsProfit >= 0 ? TrendingUp : TrendingDown} tone={bank.betsProfit > 0 ? "positive" : bank.betsProfit < 0 ? "negative" : "neutral"} />
@@ -113,7 +124,7 @@ export default function BankrollPage() {
         <StatCard label="Saques" value={formatCurrency(bank.withdrawals, currency)} icon={ArrowUpFromLine} />
         <StatCard label="Bônus" value={formatCurrency(bank.bonuses, currency)} icon={Sparkles} />
         <StatCard label="ROI sobre banca inicial" value={formatPercent(roiInitial)} icon={Target} tone={roiInitial > 0 ? "positive" : roiInitial < 0 ? "negative" : "neutral"} />
-        <StatCard label="ROI sobre capital" value={formatPercent(roiCapital)} icon={Gauge} tone={roiCapital > 0 ? "positive" : roiCapital < 0 ? "negative" : "neutral"} />
+        <StatCard label="ROI sobre capital" value={formatPercent(roiCapital)} icon={Gauge} tone={roiCapital > 0 ? "positive" : roiCapital < 0 ? "negative" : "neutral"} hint={roiInitial === roiCapital ? "= banca inicial (sem depósitos)" : undefined} />
         <StatCard label="Unidade atual" value={formatCurrency(profile?.unit_value ?? 0, currency)} icon={Ruler} hint={profile?.unit_mode === "percent" ? `${profile?.unit_percent}% da banca` : "Fixa"} />
         <StatCard label="Apostas liquidadas" value={metrics.settledBets} icon={ListChecks} />
       </div>
@@ -122,7 +133,7 @@ export default function BankrollPage() {
         <h3 className="text-sm font-semibold mb-1">Composição da banca</h3>
         <p className="text-xs text-muted-foreground mb-3">Como a banca inicial virou a banca atual: cada barra soma (ou subtrai) sobre a anterior.</p>
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={waterfall}>
+          <BarChart data={waterfall} maxBarSize={120}>
             <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
             <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
@@ -167,7 +178,7 @@ export default function BankrollPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {txs.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma transação registrada.</TableCell></TableRow>}
+            {txs.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma transação registrada. <Button variant="outline" size="sm" className="ml-2" onClick={() => setOpen(true)}>Nova transação</Button></TableCell></TableRow>}
             {txs.map((t) => {
               const isOut = t.tx_type === "withdrawal" || Number(t.amount) < 0;
               return (
@@ -180,7 +191,7 @@ export default function BankrollPage() {
                     {isOut ? "−" : "+"}{formatCurrency(Math.abs(Number(t.amount)), currency)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => deleteTx.mutate(t.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Excluir transação" onClick={() => setTxToDelete(t)}><Trash2 className="h-4 w-4" /></Button>
                   </TableCell>
                 </TableRow>
               );
@@ -188,6 +199,34 @@ export default function BankrollPage() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!txToDelete} onOpenChange={(o) => { if (!o) setTxToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir transação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {txToDelete && (
+                <>
+                  {TX_LABELS[txToDelete.tx_type]} de {formatCurrency(Math.abs(Number(txToDelete.amount)), currency)} em {formatDateTime(txToDelete.tx_date)}. Esta ação não pode ser desfeita e altera a composição da banca.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (txToDelete) {
+                  deleteTx.mutate(txToDelete.id, { onSuccess: () => toast.success("Transação excluída") });
+                  setTxToDelete(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

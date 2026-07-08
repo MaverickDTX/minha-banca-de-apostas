@@ -226,86 +226,99 @@ export function BetCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <BookmakerLogo name={bet.bookmaker ?? "—"} size="md" />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold truncate">{bet.bookmaker || "Sem casa"}</span>
-            <StatusBadgePop status={bet.status}>
-              <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide", STATUS_COLORS[bet.status])}>
-                {STATUS_LABELS[bet.status]}
-              </Badge>
-            </StatusBadgePop>
-          </div>
-          <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2 mt-0.5">
-            {bet.sport && <span>{bet.sport}</span>}
-            {bet.league && <span>· {bet.league}</span>}
-            <span>· {TYPE_LABEL[bet.bet_type] ?? bet.bet_type}</span>
-            <span>· {TIMING_LABEL[bet.timing] ?? bet.timing}</span>
-            <span>· {formatDate(bet.bet_date)}</span>
-          </div>
+          {isMultiple ? (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  className="flex items-center gap-2.5 text-left flex-1 min-w-0"
+                  disabled={legs.length === 0}
+                >
+                  <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold leading-tight truncate">
+                      Múltipla: {legs[0]?.event_name || bet.event_name || "—"}
+                      {legs.length > 1 && (
+                        <span className="text-muted-foreground font-normal"> +{legs.length - 1} jogo{legs.length - 1 > 1 ? "s" : ""}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {legs.length} perna{legs.length !== 1 ? "s" : ""} · odd total {formatNumber(Number(bet.odds), 3)}
+                    </div>
+                  </div>
+                  {legs.length > 0 && (
+                    expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                </button>
+                <StatusBadgePop status={bet.status}>
+                  <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
+                    {STATUS_LABELS[bet.status]}
+                  </Badge>
+                </StatusBadgePop>
+              </div>
+              {expanded && (
+                <ol className="mt-2 space-y-1.5 border-l border-border/60 pl-3">
+                  {legs.map((leg, idx) => (
+                    <li key={leg.id} className="text-xs flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate">
+                          <span className="text-muted-foreground">{idx + 1}.</span> {leg.event_name || "—"}
+                        </div>
+                        <div className="text-muted-foreground truncate">
+                          {leg.market || "—"}
+                          {leg.selection ? <span> — {leg.selection}</span> : null}
+                          {" · "}@{formatNumber(Number(leg.odds), 2)}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn("text-[9px] uppercase shrink-0", LEG_STATUS_COLORS[leg.status])}>
+                        {LEG_STATUS_LABELS[leg.status]}
+                      </Badge>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
+                  <span className="font-semibold truncate">{bet.event_name || "—"}</span>
+                </div>
+                <StatusBadgePop status={bet.status}>
+                  <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
+                    {STATUS_LABELS[bet.status]}
+                  </Badge>
+                </StatusBadgePop>
+              </div>
+              <div className="text-xs text-foreground/80 truncate mt-1.5">
+                {bet.market || "—"}
+                {bet.selection ? <span> — {bet.selection}</span> : null}
+              </div>
+            </>
+          )}
         </div>
-        {quickActions("top-2.5 right-12")}
+        {quickActions("flex-col right-2 top-1/2 -translate-y-1/2")}
         {menu}
       </div>
 
-      <div className="pl-[52px] -mt-1">
-        {isMultiple ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-left w-full group"
-              disabled={legs.length === 0}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-medium leading-tight truncate">
-                  Múltipla: {legs[0]?.event_name || bet.event_name || "—"}
-                  {legs.length > 1 && (
-                    <span className="text-muted-foreground font-normal"> +{legs.length - 1} jogo{legs.length - 1 > 1 ? "s" : ""}</span>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {legs.length} perna{legs.length !== 1 ? "s" : ""} · odd total {formatNumber(Number(bet.odds), 3)}
-                </div>
-              </div>
-              {legs.length > 0 && (
-                expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-              )}
-            </button>
-            {expanded && (
-              <ol className="mt-2 space-y-1.5 border-l border-border/60 pl-3">
-                {legs.map((leg, idx) => (
-                  <li key={leg.id} className="text-xs flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate">
-                        <span className="text-muted-foreground">{idx + 1}.</span> {leg.event_name || "—"}
-                      </div>
-                      <div className="text-muted-foreground truncate">
-                        {leg.market || "—"}
-                        {leg.selection ? <span> — {leg.selection}</span> : null}
-                        {" · "}@{formatNumber(Number(leg.odds), 2)}
-                      </div>
-                    </div>
-                    <Badge variant="outline" className={cn("text-[9px] uppercase shrink-0", LEG_STATUS_COLORS[leg.status])}>
-                      {LEG_STATUS_LABELS[leg.status]}
-                    </Badge>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="font-medium leading-tight truncate">{bet.event_name || "—"}</div>
-            <div className="text-xs text-muted-foreground truncate">
-              {bet.market || "—"}
-              {bet.selection ? <span className="text-foreground/80"> — {bet.selection}</span> : null}
-            </div>
-          </>
-        )}
+      <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-1.5 items-center">
+        {[
+          bet.sport,
+          bet.league,
+          TYPE_LABEL[bet.bet_type] ?? bet.bet_type,
+          TIMING_LABEL[bet.timing] ?? bet.timing,
+          formatDate(bet.bet_date),
+        ]
+          .filter((p): p is string => Boolean(p))
+          .map((part, i) => (
+            <span key={i}>{i > 0 ? `· ${part}` : part}</span>
+          ))}
       </div>
 
-      <div className="pl-[52px] grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-xs">
         <Metric label="Odd" value={formatNumber(Number(bet.odds), 2)} mono />
         <Metric
           label="Stake"
@@ -349,7 +362,7 @@ export function BetCard({
         )}
       </div>
 
-      <div className="pl-[52px] flex items-center justify-between border-t border-border/60 pt-2 mt-1">
+      <div className="flex items-center justify-between border-t border-border/60 pt-2 mt-1">
         <span className="text-xs text-muted-foreground">Lucro líquido</span>
         <span
           className={cn(
