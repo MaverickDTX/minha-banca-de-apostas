@@ -9,6 +9,7 @@ Data: 2026-07-08 (última atualização; histórico abaixo)
 - **Separador da meta**: pipe `|` → bullet `•` como elemento flex separado entre cada parte, centralizado pelo `gap-x-1.5` do container. Pipe mantido no modo compacto (a pedido) e sublinhas de múltipla.
 - **Demais fontes reduzidas em 1px**: seleção (`13px` → `12px`), meta (`text-xs`/12px → `11px`), valores de métricas (`text-sm`/14px → `13px`), rótulos de métricas (`10px` → `9px`), lucro líquido label (`12px` → `11px`), badges (`11px` → `10px`), leg badge (`9px` → `8px`). Compact mode: meta (`11px` → `10px`), valores (`14px` → `13px`).
 - **Meta reposicionada**: movida para dentro do `flex-1 min-w-0` (antes era irmã do row principal, separada por `gap-3`), agora logo abaixo da seleção com `mt-1.5`. O `gap-3` do container agora só separa meta→métricas e métricas→lucro.
+- **Hover efeito "elevar"** (só scale+shadow, sem ring — ring colidia com barra lateral de status): card cheio e compacto — ambos com `hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-xl` + `motion-safe:transition-all motion-safe:duration-200`.
 
 ### Tooltip recharts — dismiss inteligente em mobile (Dashboard + Análises)
 O fix anterior disparava `mouseleave` em todos os charts em cada `touchend` — corria antes do recharts processar o toque, então o tooltip nunca aparecia. Novo comportamento: "tap no chart → mostra, tap fora → esconde". Um `touchstart` listener rastreia qual chart foi tocado; no toque seguinte fora dele, dispara `mouseleave` só naquele SVG. Comportamento natural de mobile, sem interferir no hover desktop.

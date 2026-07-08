@@ -169,7 +169,7 @@ export function BetCard({
     return (
       <div
         className={cn(
-          "surface group relative pl-3 pr-2 py-2 flex items-center gap-3 transition hover:border-foreground/20 h-full",
+          "surface group relative pl-3 pr-2 py-2 flex items-center gap-3 motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:hover:shadow-xl h-full",
           "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
           STATUS_ACCENT[bet.status],
         )}
@@ -220,7 +220,7 @@ export function BetCard({
   return (
     <div
       className={cn(
-        "surface group relative pl-4 pr-3 py-4 flex flex-col gap-3 transition hover:border-foreground/20 h-full",
+        "surface group relative pl-4 pr-3 py-4 flex flex-col gap-3 motion-safe:transition-all motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:hover:shadow-xl h-full",
         "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-l-lg",
         STATUS_ACCENT[bet.status],
       )}
