@@ -1,6 +1,92 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Data: 2026-07-07 (última atualização; histórico abaixo)
+Data: 2026-07-08 (última atualização; histórico abaixo)
+
+## ✅ Sessão 2026-07-08 — Refinamentos do BetCard iterados com o usuário + confirmação de exclusão em Banca
+
+Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário sobre a rodada de consistência.
+
+### BetCard (card cheio) — forma final após 3 iterações
+- **Logo da casa: 32px (`size="sm"`) ao lado do evento** — decisão do usuário após testar (a) logo 16px na meta (ilegível, wordmark não sobrevive a 16px), (b) sem logo nenhum ("pobre"). Tooltip com o nome no hover.
+- **Casa removida da linha de metadados** (texto e logo) — o logo no título já identifica; linha ficou "Futebol | FIFA World Cup | Simples | Pré-live | data".
+- **Meta montada por array filtrada + join condicional** — esporte/liga vazios não deixam separador órfão.
+- **Separador: pipe `|`** em todo o card (meta, compacto, sublinhas de múltipla). Testados antes: `·` (some em 11px) e `•`. Decisão do usuário.
+- **Quick actions do hover: coluna vertical à direita** (`flex-col right-2 top-1/2 -translate-y-1/2`) — a barra horizontal no topo cobria o badge de status. Agora ocupa a zona morta ao lado das métricas.
+- **Escala tipográfica final**: evento `text-lg` semibold (18px) → seleção 13px `text-foreground/80` → valores de métricas `text-sm` (14px, rótulos 10px) → meta `text-xs` (12px muted). Respiro `mt-1.5` entre seleção e badge.
+- Modo compacto intocado (exceto separadores pipe).
+
+### Banca — confirmação ao excluir transação
+- A lixeira da tabela deletava direto (`deleteTx.mutate` no clique). Agora abre `AlertDialog` descrevendo o dado em risco ("Depósito de R$ X em DATA..."). Apostas já tinham confirmação (individual e lote) — o gap era só aqui.
+
+### Sidebar — "Nova aposta" removido
+- Ação, não destino; CTAs existem no Dashboard e em Apostas. Usuário confundia com a página "Apostas". (Commitado em `1d3c9a1`.)
+
+### Estado de commit
+- Commitados: sidebar, rodada consolidada, BetCard (logo/meta/quick actions), dialog de transação.
+- **Aguardando commit**: BetCard.tsx (fontes 18/13/14/12px + separador pipe) e este HANDOFF.md.
+- Verificação: `tsc --noEmit` OK via fluxo canônico off-mount. **Nota nova de ambiente**: `vite build` não roda no sandbox (node_modules instalado no Windows → rollup só tem binário win32); validar com tsc/vitest e deixar o build para o Vercel.
+
+### Backlog atualizado (ordem de relevância)
+1. Tooltip do recharts preso após tap em mobile (Dashboard/Análises) — opcional, registrado na sessão mobile.
+2. Teste mobile real das demais telas (Apostas, Análises, Banca, Nova aposta) — só o Dashboard foi validado em aparelho.
+3. #26 constantes duplicadas (`DAY_NAMES` em 3 arquivos, `CHART_RANGES`/`PRESETS` em 2), #33 lint `unused-imports`, #32 tipos gerados não usados, #34 docs antigos, #35 tema claro com hue antigo.
+4. #15b apagar conta (exige Edge Function com service role + confirmação forte).
+5. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
+
+## ✅ Sessão 2026-07-07 (4) — Rodada de consistência UI (8 telas)
+
+### O que foi feito
+
+**1. BetForm — "—" no painel calculado sem odd válida**
+- `Prob. implícita` e `Lucro líquido (calc)` mostram "—" quando `effectiveOdds <= 1`, alinhando com `Retorno potencial` e `Lucro potencial`.
+
+**2. BetForm — menores**
+- Placeholder `"Ex: 1.85"` nos inputs de Odd (básico e avançado).
+- Prefixo de moeda (R$/US$/€) no input Stake com `pl-9`; label `Stake (BRL)` → `Stake`.
+- Grid do painel calculado: `md:grid-cols-4` → `md:grid-cols-5`.
+- Tooltip (?) no toggle "Manter informações do evento" explicando a função.
+
+**3. Bankroll — grid de KPIs, waterfall, hint, empty state**
+- `xl:grid-cols-6` → `xl:grid-cols-5` (2 linhas simétricas de 5).
+- `maxBarSize={120}` no waterfall "Composição da banca".
+- Hint "= banca inicial (sem depósitos)" no ROI sobre capital quando igual ao ROI inicial.
+- Empty state da tabela de transações com botão "Nova transação".
+
+**4. Análises — dispersão Stake × lucro**
+- `fillOpacity={0.55}` nos `<Cell>` do Scatter para revelar sobreposição de pontos.
+- `domain` padding no Y para ponto extremo não colar na borda.
+
+**5. `--accent` documentado**
+- Comentário nos tokens light e dark: `/* ciano — quantidades neutras (contagens, composição); verde/vermelho = dinheiro/resultado */`.
+
+**6. Bets — select de paginação truncado**
+- Label `"20 por pág."` → `"20/pág"` para caber no trigger sem truncar.
+
+**7. Import/Export — confirmado: botões já desabilitados quando count = 0.**
+
+**8. BetCard — hierarquia reordenada (card cheio)**
+- Evento como manchete (`font-semibold`), substituindo nome da casa.
+- Seleção logo abaixo com `text-foreground/80`.
+- Badge de status migrado para o canto superior direito.
+- Casa com logo miniatura (16px) na linha de metadados.
+- `pl-[52px]` removido das seções de conteúdo (logo não está mais à esquerda).
+- Modo compacto (`compact`), quick actions, menu ⋯, borda lateral, expander de múltiplas preservados.
+
+**Extra: tooltip do recharts — dismiss em touch (Dashboard + Análises)**
+- `touchend` listener dispara `mouseleave` nos SVGs dos gráficos para tooltips não ficarem presos no mobile.
+
+### Verificação
+`tsc --noEmit`, `vitest run` (109/109) OK.
+
+### Arquivos alterados
+- `src/components/bets/BetForm.tsx`
+- `src/pages/Bankroll.tsx`
+- `src/pages/Analytics.tsx`
+- `src/pages/Bets.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/components/bets/BetCard.tsx`
+- `src/index.css`
+- `HANDOFF.md`
 
 ## ✅ Sessão 2026-07-07 (3) — Correções mobile do Dashboard
 

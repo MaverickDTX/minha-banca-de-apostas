@@ -188,9 +188,9 @@ export function BetCard({
           </div>
           <div className="text-[11px] text-muted-foreground truncate">
             {bet.bookmaker || "—"}
-            {bet.market ? ` · ${bet.market}` : ""}
+            {bet.market ? ` | ${bet.market}` : ""}
             {bet.selection ? ` — ${bet.selection}` : ""}
-            {" · "}{formatDate(bet.bet_date)}
+            {" | "}{formatDate(bet.bet_date)}
           </div>
         </div>
         <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-sm">
@@ -238,14 +238,14 @@ export function BetCard({
                 >
                   <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold leading-tight truncate">
+                    <div className="text-lg font-semibold leading-tight truncate">
                       Múltipla: {legs[0]?.event_name || bet.event_name || "—"}
                       {legs.length > 1 && (
                         <span className="text-muted-foreground font-normal"> +{legs.length - 1} jogo{legs.length - 1 > 1 ? "s" : ""}</span>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {legs.length} perna{legs.length !== 1 ? "s" : ""} · odd total {formatNumber(Number(bet.odds), 3)}
+                      {legs.length} perna{legs.length !== 1 ? "s" : ""} | odd total {formatNumber(Number(bet.odds), 3)}
                     </div>
                   </div>
                   {legs.length > 0 && (
@@ -269,7 +269,7 @@ export function BetCard({
                         <div className="text-muted-foreground truncate">
                           {leg.market || "—"}
                           {leg.selection ? <span> — {leg.selection}</span> : null}
-                          {" · "}@{formatNumber(Number(leg.odds), 2)}
+                          {" | "}@{formatNumber(Number(leg.odds), 2)}
                         </div>
                       </div>
                       <Badge variant="outline" className={cn("text-[9px] uppercase shrink-0", LEG_STATUS_COLORS[leg.status])}>
@@ -285,7 +285,7 @@ export function BetCard({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <BookmakerLogo name={bet.bookmaker ?? "—"} size="sm" className="shrink-0" />
-                  <span className="font-semibold truncate">{bet.event_name || "—"}</span>
+                  <span className="text-lg font-semibold truncate">{bet.event_name || "—"}</span>
                 </div>
                 <StatusBadgePop status={bet.status}>
                   <Badge variant="outline" className={cn("text-[11px] px-2.5 py-0.5 font-semibold uppercase tracking-wide shrink-0", STATUS_COLORS[bet.status])}>
@@ -293,7 +293,7 @@ export function BetCard({
                   </Badge>
                 </StatusBadgePop>
               </div>
-              <div className="text-xs text-foreground/80 truncate mt-1.5">
+              <div className="text-[13px] text-foreground/80 truncate mt-1.5">
                 {bet.market || "—"}
                 {bet.selection ? <span> — {bet.selection}</span> : null}
               </div>
@@ -304,7 +304,7 @@ export function BetCard({
         {menu}
       </div>
 
-      <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-1.5 items-center">
+      <div className="text-xs text-muted-foreground flex flex-wrap gap-x-1.5 items-center">
         {[
           bet.sport,
           bet.league,
@@ -314,11 +314,11 @@ export function BetCard({
         ]
           .filter((p): p is string => Boolean(p))
           .map((part, i) => (
-            <span key={i}>{i > 0 ? `· ${part}` : part}</span>
+            <span key={i}>{i > 0 ? `| ${part}` : part}</span>
           ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 text-sm">
         <Metric label="Odd" value={formatNumber(Number(bet.odds), 2)} mono />
         <Metric
           label="Stake"
