@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useTelegramLink, useGenerateLinkCode, useUnlinkTelegram } from "@/hooks/useTelegramLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,10 @@ export default function SettingsPage() {
   useEffect(() => { document.title = "Configurações · Bankroll Pro"; }, []);
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
+  const { data: telegramLink } = useTelegramLink();
+  const generateCode = useGenerateLinkCode();
+  const unlinkTelegram = useUnlinkTelegram();
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     display_name: "",
@@ -258,6 +263,51 @@ export default function SettingsPage() {
                   <button type="button" onClick={() => removeTipster(t)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover ${t}`}>×</button>
                 </span>
               ))}
+            </div>
+          )}
+        </Box>
+
+        <Box title="Telegram" description="Conecte sua conta ao @BankrollProBot para cadastrar apostas por foto ou mensagem.">
+          {telegramLink?.chat_id ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-success"></span>
+                <span className="text-sm font-medium">Conectado ✅</span>
+              </div>
+              <Button variant="outline" onClick={() => unlinkTelegram.mutate(undefined, { onError: () => toast.error("Erro ao desvincular. Tente novamente.") })} disabled={unlinkTelegram.isPending}>
+                {unlinkTelegram.isPending ? "Desvinculando..." : "Desvincular"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const code = await generateCode.mutateAsync();
+                    setGeneratedCode(code);
+                  } catch {
+                    toast.error("Erro ao gerar código. Tente novamente.");
+                  }
+                }}
+                disabled={generateCode.isPending}
+              >
+                {generateCode.isPending ? "Gerando..." : "Gerar código de vínculo"}
+              </Button>
+              {generatedCode && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Envie <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-sm">/vincular {generatedCode}</kbd>
+                    para <a href="https://t.me/BankrollProBot" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">@BankrollProBot</a> no Telegram.
+                  </p>
+                  <Input
+                    readOnly
+                    value={generatedCode}
+                    className="text-center text-xl font-mono tracking-widest"
+                  />
+                  <p className="text-xs text-muted-foreground">Código expira em 10 minutos.</p>
+                </div>
+              )}
             </div>
           )}
         </Box>

@@ -1,6 +1,31 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Data: 2026-07-04 (última atualização; histórico abaixo)
+Data: 2026-07-07 (última atualização; histórico abaixo)
+
+## ✅ Sessão 2026-07-07 — Bot Telegram: fix de posse no callback + kill-switch /pausar (deployado, aguardando commit)
+
+Contexto: o bot Telegram (edge function `telegram-webhook`, migration `20260706120000_telegram_bot.sql`, detalhes em `PROMPT-TELEGRAM-BOT.md`) foi criado em 06/07 e não estava registrado neste handoff. Fluxo: foto/texto → Gemini (cadeia de providers em `providers.ts`) → resumo + botões Confirmar/Corrigir/Cancelar → RPC `create_bet_from_telegram`. Auth do webhook via `X-Telegram-Bot-Api-Secret-Token`. Gate de uso: `resolveUser(chatId)` exige vínculo em `telegram_links` (via `/vincular CODIGO` gerado no app) antes de qualquer chamada ao Gemini — funciona como allowlist estrutural.
+
+### Fix: callback query sem verificação de posse
+`handleCallbackQuery` buscava o pending só por `id` — um chat vinculado que conhecesse o UUID de um pending alheio podia confirmá-lo/alterá-lo/cancelá-lo. Agora a busca filtra `id` + `chat_id` uma única vez no topo, cobrindo os 3 branches (c/e/x).
+
+### Feature: kill-switch `/pausar` e `/retomar`
+- Tabela `telegram_settings` (key/value JSONB, service_role only) — migration `20260707120000_telegram_settings.sql`.
+- Comandos restritos a chat vinculado; flag `extraction_paused`.
+- Early return no `serve()` antes de qualquer caminho que chame o Gemini (foto, texto livre e correção). Uso: quando a chave Gemini falhar ou custo explodir, `/pausar` corta tudo sem redeploy.
+
+### Hardening: grants alinhados à intenção
+Default privileges do schema haviam concedido ALL a `anon`/`authenticated` em `telegram_links` e `telegram_pending_bets` (RLS já negava acesso efetivo — teste #9 passou por isso, não pelos grants). Migration `20260707120100_telegram_tables_tighten_grants.sql`: REVOKE ALL + re-grant só de SELECT/INSERT/UPDATE em `telegram_links` para `authenticated`. Verificado no banco: grants agora exatamente como declarado.
+
+### Deploy & verificação
+- Migrations aplicadas no remoto via MCP e salvas no repo.
+- Edge function redesployada (versão 8, ACTIVE, `verify_jwt=false` — auth é o secret token).
+- **Pendente de verificação manual**: sandbox não alcança `*.supabase.co` via curl. Rodar do Windows: `curl -s -o NUL -w "%{http_code}" -X POST https://cttdibubqgrpkdzhojtn.supabase.co/functions/v1/telegram-webhook -H "Content-Type: application/json" -d "{}"` — espera-se `401`. Depois testar `/pausar` → foto (deve recusar) → `/retomar` no Telegram.
+- Working tree: `index.ts` do webhook + 2 migrations novas + HANDOFF.md aguardando commit (pelo Windows, conforme regra FUSE).
+
+### Dívida registrada (bot)
+- Testes do bot (#1–#10 da sessão 06/07) são manuais/one-shot; converter #8 (401) e #9 (grants) em script curl/SQL se o bot evoluir.
+- `getPendingBet()` em `index.ts` está morta (nunca chamada) — remover no próximo toque no arquivo.
 
 ## ✅ Sessão 2026-07-04 (2) — Limpeza de UI morta + remoção de exports não usados (working tree sujo, aguardando commit)
 
