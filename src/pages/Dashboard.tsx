@@ -169,7 +169,7 @@ export default function Dashboard() {
       )}
 
       {isLoading && bets.length === 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="surface p-4 space-y-3">
               <Skeleton className="h-3 w-1/2" />
@@ -178,7 +178,7 @@ export default function Dashboard() {
           ))}
         </div>
       ) : (
-        <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
           <motion.div variants={fadeUp}><StatCard size="lg" label="Banca atual" value={<CountUp value={bank.current} format={(n) => formatCurrency(n, currency)} />} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} to="/bankroll" /></motion.div>
           <motion.div variants={fadeUp}><StatCard size="lg" label="Lucro / prejuízo" value={<CountUp value={metrics.netProfit} format={(n) => formatCurrency(n, currency)} />} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
           <motion.div variants={fadeUp}><StatCard size="lg" label="ROI" value={<CountUp value={roi} format={(n) => formatPercent(n)} />} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
@@ -186,7 +186,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
         <motion.div variants={fadeUp}><StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} icon={Banknote} to={buildAnalyticsUrl()} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} icon={ListChecks} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} to={buildAnalyticsUrl()} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Taxa de acerto" value={formatPercent(metrics.hitRate, 1)} icon={Percent} info="Apostas ganhas sobre o total decidido (voids e pendentes fora). Sozinha não diz lucro — depende das odds." to={buildAnalyticsUrl({ view: "winrate" })} /></motion.div>
@@ -196,7 +196,7 @@ export default function Dashboard() {
         <motion.div variants={fadeUp}>
           <StatCard
             label="Sequência atual"
-            value={metrics.currentStreak.type === "none" ? "—" : `${metrics.currentStreak.count} ${metrics.currentStreak.type === "green" ? "ganhas" : "perdidas"}`}
+            value={metrics.currentStreak.type === "none" ? "—" : `${metrics.currentStreak.count} ${metrics.currentStreak.type === "green" ? (metrics.currentStreak.count === 1 ? "ganha" : "ganhas") : (metrics.currentStreak.count === 1 ? "perdida" : "perdidas")}`}
             icon={Flame}
             tone={metrics.currentStreak.type === "green" ? "positive" : metrics.currentStreak.type === "red" ? "negative" : "neutral"}
             to={streakTo}
@@ -273,7 +273,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={statusBreak}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-              <XAxis dataKey="status" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <XAxis dataKey="status" stroke="hsl(var(--muted-foreground))" fontSize={10} interval={0} tickFormatter={(v: string) => v === "Meio Ganha" ? "Meio G." : v === "Meio Perdida" ? "Meio P." : v} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
               <Bar

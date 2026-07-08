@@ -65,7 +65,7 @@ export function StatCard({
       <div
         className={cn(
           "stat-value",
-          size === "lg" && "text-3xl",
+          size === "lg" && "text-2xl md:text-3xl",
           tone === "positive" && "positive",
           tone === "negative" && "negative",
         )}

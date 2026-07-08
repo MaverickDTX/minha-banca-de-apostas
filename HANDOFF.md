@@ -2,6 +2,32 @@
 
 Data: 2026-07-07 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-07 (3) — Correções mobile do Dashboard
+
+Teste mobile real (viewport 338px) revelou 3 problemas corrigidos + 1 documentado.
+
+### 🔴 Fix: KPIs primários clipados (StatCard.tsx + Dashboard.tsx)
+- `text-3xl` → `text-2xl md:text-3xl` no branch `size === "lg"` do StatCard para evitar estouro em mobile.
+- `min-w-0` adicionado aos grids de KPIs (primário e secundário) para permitir encolhimento.
+
+### 🟡 Fix: Concordância da sequência (Dashboard.tsx)
+- Plural condicional: "1 perdidas" → "1 perdida", "2 perdidas", "1 ganha", "2 ganhas".
+
+### 🟡 Fix: Rótulos pulados no eixo X de "Status das apostas" (Dashboard.tsx)
+- `interval={0}` + `fontSize={10}` + `tickFormatter` abrevia "Meio Ganha" → "Meio G." e "Meio Perdida" → "Meio P.".
+
+### 🟢 Tooltip persistente após toque (não corrigido)
+- Problema conhecido do recharts: tooltip fica preso após tap em touch. Soluções baratas não existem (exigiriam state management customizado ou mutação do DOM). Registrado como dívida.
+- Analytics.tsx não foi inspecionado (escopo do prompt era só Dashboard).
+
+### Verificação
+`tsc --noEmit`, `vitest run` (109/109) OK.
+
+### Arquivos alterados
+- `src/components/StatCard.tsx`
+- `src/pages/Dashboard.tsx`
+- `HANDOFF.md`
+
 ## ✅ Sessão 2026-07-07 (2) — Refactor UX da página Configurações (Settings.tsx)
 
 ### Problema central resolvido: perda de dados por falsa sensação de persistência
@@ -257,7 +283,7 @@ Removido `scale="time"` (era ele que fazia o recharts emitir um tick por ponto) 
 - ~~**#18 Recortes de tempo**~~ ✅ FEITO (2026-07-01, aguardando commit): pills 7d/14d/30d/90d/Tudo no filtro das Análises; editar data manualmente desmarca o preset.
 - ~~**Tradução de esportes**~~ ✅ FEITO: `mapSportLabel` reescrito como mapa com ~30 esportes (nota: "american football" agora → "Futebol Americano", antes "NFL"); dados legados migrados no banco via SQL (3 rows: Mixed Martial Arts→MMA, Motor Sport→Automobilismo, Water Polo→Polo Aquático).
 - **#17 Dashboard personalizável** (KPIs/cards). Baixa prioridade.
-- **#23 — P1 do relatório RESOLVIDOS** (2026-07-01, aguardando commit): lucro "—" p/ pendentes (BetCard + tabela); "Retorno/Lucro potencial" = "—" sem odd válida (BetForm); eixo temporal numérico (timestamp + scale="time") em Evolução da banca (Dashboard e Bankroll) e no Lucro acumulado & drawdown (Analytics, antes índices crus); meses zero-fill no Resultado por mês; histograma de odds em ordem fixa das faixas; CLV/EV médio = "—" sem dados (novos campos clvCount/evCount em Metrics); barra fantasma corrigida (sport string vazia → "Outro"/"—", `||` em vez de `??` nos agrupadores); YAxis do Lucro por esporte alargado (95px). P2 restantes: teste mobile real. ~~Copy~~ ✅ (2026-07-02): tabela de múltiplas agora diz "Múltipla · pernas em Editar"; sidebar/página "Bankroll" → "Banca" (URL /bankroll mantida). Fontes 9-11px/contraste ainda em aberto.
+- **#23 — P1 do relatório RESOLVIDOS** (2026-07-01, aguardando commit): lucro "—" p/ pendentes (BetCard + tabela); "Retorno/Lucro potencial" = "—" sem odd válida (BetForm); eixo temporal numérico (timestamp + scale="time") em Evolução da banca (Dashboard e Bankroll) e no Lucro acumulado & drawdown (Analytics, antes índices crus); meses zero-fill no Resultado por mês; histograma de odds em ordem fixa das faixas; CLV/EV médio = "—" sem dados (novos campos clvCount/evCount em Metrics); barra fantasma corrigida (sport string vazia → "Outro"/"—", `||` em vez de `??` nos agrupadores); YAxis do Lucro por esporte alargado (95px). P2 restantes: tooltip do recharts preso após tap em touch (conhecido, ver sessão 2026-07-07 (3)). ~~Copy~~ ✅ (2026-07-02): tabela de múltiplas agora diz "Múltipla · pernas em Editar"; sidebar/página "Bankroll" → "Banca" (URL /bankroll mantida). Fontes 9-11px/contraste ainda em aberto.
 - **Gráfico duplicado RESOLVIDO** (decisão do usuário): Bankroll trocou "Evolução da banca" (ficou só no Dashboard) por **"Composição da banca"** — cascata inicial → depósitos/bônus/ajustes/saques/lucro → atual (waterfall via barras empilhadas com base transparente + `tooltipType="none"`).
 - **Tooltips dos gráficos RESOLVIDO** (reporte do usuário com screenshot): texto do tooltip ilegível no dark mode (cor default do recharts) e nomes de série em inglês ("profit"). Todos os Tooltips ganharam `labelStyle`/`itemStyle` com `--popover-foreground`, `cursor` temático (`--muted` 40%) e as séries ganharam `name` em PT (Banca, Lucro, Apostas, Drawdown, Variação).
 - **#23 Avaliação UI/UX**: ✅ **FEITA** (2026-07-01, navegação real em produção via Chrome) — relatório completo em `UIUX_REVIEW.md` na raiz (não versionado por padrão; adicionar ao .gitignore ou commitar, decisão do usuário). Achado P0: deep link/F5 dava 404 (vercel.json legado sem SPA fallback) — **corrigido no vercel.json, aguardando commit**. P1 pendentes (precisão de dados): lucro "R$ 0,00" em pendentes → "—"; eixo X com índices crus no gráfico de drawdown; eixo temporal categórico esconde gap 2023→2026; histograma de odds fora de ordem; coluna EV médio morta; lucro potencial negativo com odd vazia. P2: idioma misto (sidebar "Bankroll", esportes sem tradução), gráfico banca duplicado com cores diferentes, barra fantasma no "Lucro por esporte", selects truncados. Teste mobile real pendente (janela recusou resize; análise de código ok). Conecta com #14 e #17.
