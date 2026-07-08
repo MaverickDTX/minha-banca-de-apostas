@@ -2,6 +2,47 @@
 
 Data: 2026-07-07 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-07 (2) — Refactor UX da página Configurações (Settings.tsx)
+
+### Problema central resolvido: perda de dados por falsa sensação de persistência
+
+Cards de Casas de Aposta e Tipsters mostravam chips imediatamente ao adicionar, mas só persistiam no "Salvar". O tema também alternava visualmente no DOM mas não salvava. Solução: sticky bar de salvamento com dirty-state tracking.
+
+### O que foi feito (4 tarefas do PROMPT-SETTINGS-UX.md)
+
+**1. Dirty-state + barra de salvamento sticky**
+- Extraída função `profileToForm(profile)` como fonte única para hidratação do form e comparação de baseline.
+- `isDirty` via `JSON.stringify` dos objetos normalizados (arrays ordenados garantem consistência).
+- Barra `sticky bottom-0` com fundo `bg-card/95 backdrop-blur-sm`, visível apenas quando `isDirty` e component ready.
+- Botão "Salvar" submete o form sem submit HTML; "Descartar" restaura o baseline e re-aplica a classe de tema no DOM.
+- `beforeunload` listener ativo enquanto `isDirty`.
+- Animação fade+slide (8px) via framer-motion, reusando tokens `DUR.reveal`/`EASE.out`/`RISE` de `motion.ts`.
+
+**2. Layout em 2 colunas agrupado por domínio**
+- Container `max-w-2xl` → `max-w-5xl`.
+- Grid `lg:grid-cols-2 gap-4 items-start` com duas stacks explícitas.
+- **Coluna A**: Perfil, Configurações das Apostas, Segurança.
+- **Coluna B**: Casas de Aposta, Tipsters, Telegram, Aparência.
+- `<form>` principal removido (save via `onClick` no botão da sticky bar). `<form>` de Segurança mantido para password managers.
+- Emobile (< lg) as colunas empilham na ordem A→B.
+
+**3. Telegram: badge sem emoji + confirmação no Desvincular**
+- `Conectado ✅` → dot verde (`bg-success`) + `text-success font-medium` sem emoji.
+- "Desvincular" envolto em `AlertDialog` (componente já existente no bundle) com título "Desvincular Telegram?" e descrição explicativa.
+
+**4. Ajustes menores**
+- Prefixo de moeda (`R$`/`US$`/`€`) como span absoluto à esquerda com `pl-9` no Input nos campos "Banca inicial" e "Valor da unidade".
+- Removido `({form.currency})` do label "Valor da unidade" (redundante com prefixo).
+- `--input` no dark: luminosidade subiu de 17% → 24% (~7pp, dentro da faixa recomendada).
+
+### Verificação
+`tsc --noEmit`, `vitest run` (109/109) e `vite build` OK via fluxo off-mount.
+
+### Arquivos alterados
+- `src/pages/Settings.tsx`
+- `src/index.css`
+- `HANDOFF.md`
+
 ## ✅ Sessão 2026-07-07 — Bot Telegram: fix de posse no callback + kill-switch /pausar (deployado, aguardando commit)
 
 Contexto: o bot Telegram (edge function `telegram-webhook`, migration `20260706120000_telegram_bot.sql`, detalhes em `PROMPT-TELEGRAM-BOT.md`) foi criado em 06/07 e não estava registrado neste handoff. Fluxo: foto/texto → Gemini (cadeia de providers em `providers.ts`) → resumo + botões Confirmar/Corrigir/Cancelar → RPC `create_bet_from_telegram`. Auth do webhook via `X-Telegram-Bot-Api-Secret-Token`. Gate de uso: `resolveUser(chatId)` exige vínculo em `telegram_links` (via `/vincular CODIGO` gerado no app) antes de qualquer chamada ao Gemini — funciona como allowlist estrutural.
@@ -20,7 +61,7 @@ Default privileges do schema haviam concedido ALL a `anon`/`authenticated` em `t
 ### Deploy & verificação
 - Migrations aplicadas no remoto via MCP e salvas no repo.
 - Edge function redesployada (versão 8, ACTIVE, `verify_jwt=false` — auth é o secret token).
-- **Pendente de verificação manual**: sandbox não alcança `*.supabase.co` via curl. Rodar do Windows: `curl -s -o NUL -w "%{http_code}" -X POST https://cttdibubqgrpkdzhojtn.supabase.co/functions/v1/telegram-webhook -H "Content-Type: application/json" -d "{}"` — espera-se `401`. Depois testar `/pausar` → foto (deve recusar) → `/retomar` no Telegram.
+- ✅ **Verificação manual resolvida na sessão Settings UX**: 401 confirmado via curl do Windows; `/pausar` → foto recusada → `/retomar` volta a funcionar.
 - Working tree: `index.ts` do webhook + 2 migrations novas + HANDOFF.md aguardando commit (pelo Windows, conforme regra FUSE).
 
 ### Dívida registrada (bot)
