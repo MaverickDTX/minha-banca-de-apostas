@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
 import { Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
-import { motion, type Variants } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { DUR, EASE, RISE } from "@/lib/motion";
 import {
   AlertDialog,
@@ -201,6 +201,7 @@ export default function SettingsPage() {
   const stickyBarVariants: Variants = {
     hidden: { opacity: 0, y: RISE },
     visible: { opacity: 1, y: 0, transition: { duration: DUR.reveal, ease: EASE.out } },
+    exit: { opacity: 0, y: RISE, transition: { duration: DUR.state, ease: EASE.inOut } },
   };
 
   return (
@@ -456,22 +457,25 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {isDirty && (
-        <motion.div
-          variants={stickyBarVariants}
-          initial="hidden"
-          animate="visible"
-          className="sticky bottom-0 mt-6 -mx-4 px-4 py-3 border-t border-border bg-card/95 backdrop-blur-sm flex items-center justify-between rounded-t-xl"
-        >
-          <span className="text-sm text-muted-foreground">Alterações não salvas</span>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={discard}>Descartar</Button>
-            <Button onClick={save} disabled={update.isPending}>
-              {update.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {isDirty && (
+          <motion.div
+            variants={stickyBarVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="sticky bottom-0 mt-6 -mx-4 px-4 py-3 border-t border-border bg-card/95 backdrop-blur-sm flex items-center justify-between rounded-t-xl"
+          >
+            <span className="text-sm text-muted-foreground">Alterações não salvas</span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={discard}>Descartar</Button>
+              <Button onClick={save} disabled={update.isPending}>
+                {update.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
