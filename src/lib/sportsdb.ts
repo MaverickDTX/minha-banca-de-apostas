@@ -135,8 +135,8 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
   // para converter de inglês (TheSportsDB) → PT-BR.
   const label = hasApiProduct(rawLabel) ? rawLabel : mapSportLabel(sport ?? "");
 
-  // Tênis: Matchstat se tiver chave; senão cai no TheSportsDB (cobertura fraca)
-  if (rawLabel === "tênis" && import.meta.env.VITE_TENNIS_RAPIDAPI_KEY) {
+  // Tênis: Matchstat via proxy (edge function tennis-fixtures); fallback TheSportsDB (cobertura fraca)
+  if (rawLabel === "tênis") {
     const tennis = await searchTennisMatches(q, signal);
     if (tennis.length > 0) return tennis;
   }

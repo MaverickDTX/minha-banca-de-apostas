@@ -30,14 +30,14 @@ export function EventAutocomplete({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SportEvent[]>([]);
   const abortRef = useRef<AbortController | null>(null);
-  const justPickedRef = useRef(false);
+  const skipQueryRef = useRef<string | null>(value || null);
 
   useEffect(() => {
-    if (justPickedRef.current) {
-      justPickedRef.current = false;
+    const q = value.trim();
+    if (skipQueryRef.current !== null && q === skipQueryRef.current.trim()) {
+      setLoading(false);
       return;
     }
-    const q = value.trim();
     // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
     // útil e cada disparo custa até 6 requests somando as duas APIs.
     if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); return; }
@@ -60,7 +60,7 @@ export function EventAutocomplete({
   }, [value, sport]);
 
   function pick(ev: SportEvent) {
-    justPickedRef.current = true;
+    skipQueryRef.current = ev.name;
     abortRef.current?.abort();
     onPick({
       name: ev.name,
