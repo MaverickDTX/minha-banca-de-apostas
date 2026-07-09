@@ -106,7 +106,7 @@ export default function CalendarPage() {
                 {count > 0 && (
                   <div className="text-right overflow-hidden">
                     <div className={cn("hidden sm:block text-xs font-mono", profit > 0 ? "positive" : profit < 0 ? "negative" : "neutral")}>
-                      {formatCurrency(profit, currency)}
+                      {formatCurrency(profit, currency, profile?.unit_value)}
                     </div>
                     <div className="text-[10px] text-muted-foreground">{count} aposta{count > 1 ? "s" : ""}</div>
                   </div>
@@ -116,7 +116,7 @@ export default function CalendarPage() {
           })}
         </div>
         <div className="text-xs text-muted-foreground mt-3">
-          Resultado do mês: <span className={cn("font-mono font-semibold", monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "")}>{formatCurrency(monthProfit, currency)}</span>
+          Resultado do mês: <span className={cn("font-mono font-semibold", monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "")}>{formatCurrency(monthProfit, currency, profile?.unit_value)}</span>
         </div>
       </div>
 
@@ -128,7 +128,7 @@ export default function CalendarPage() {
               <span className="text-sm font-normal text-muted-foreground">
                 {dayBets.length} aposta{dayBets.length !== 1 ? "s" : ""} ·{" "}
                 <span className={cn("font-mono font-semibold", dayProfit > 0 ? "positive" : dayProfit < 0 ? "negative" : "")}>
-                  {formatCurrency(dayProfit, currency)}
+                  {formatCurrency(dayProfit, currency, profile?.unit_value)}
                 </span>
               </span>
             </DialogTitle>
@@ -150,11 +150,11 @@ export default function CalendarPage() {
                   </div>
                   <div className="flex items-center gap-4 shrink-0 font-mono tabular-nums text-xs text-muted-foreground">
                     <span title="Odd">@{formatNumber(Number(b.odds), 2)}</span>
-                    <span title="Stake">{formatCurrency(Number(b.stake_amount), currency)}</span>
+                    <span title="Stake">{formatCurrency(Number(b.stake_amount), currency, profile?.unit_value)}</span>
                   </div>
                   <Badge variant="outline" className={cn("shrink-0", STATUS_COLORS[b.status])}>{STATUS_LABELS[b.status]}</Badge>
                   <div className={cn("font-mono text-sm tabular-nums min-w-[84px] text-right shrink-0", net != null && net > 0 ? "positive" : net != null && net < 0 ? "negative" : "")}>
-                    {net != null ? formatCurrency(net, currency) : "—"}
+                    {net != null ? formatCurrency(net, currency, profile?.unit_value) : "—"}
                   </div>
                 </div>
               );

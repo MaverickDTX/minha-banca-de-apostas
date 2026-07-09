@@ -48,6 +48,7 @@ function currencySymbol(currency: string) {
   switch (currency) {
     case "USD": return "US$";
     case "EUR": return "€";
+    case "u": return "u";
     default: return "R$";
   }
 }
@@ -231,6 +232,7 @@ export default function SettingsPage() {
                     <SelectItem value="BRL">Real (BRL)</SelectItem>
                     <SelectItem value="USD">Dólar (USD)</SelectItem>
                     <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                    <SelectItem value="u">Unidades (u)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -255,7 +257,7 @@ export default function SettingsPage() {
                 <div>
                   <Label>Valor da unidade</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">{currencySymbol(form.currency)}</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">R$</span>
                     <Input type="number" step="0.01" value={form.unit_value} onChange={(e) => setForm({ ...form, unit_value: parseFloat(e.target.value) || 0 })} className="pl-9" />
                   </div>
                 </div>

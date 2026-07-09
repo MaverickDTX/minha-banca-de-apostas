@@ -198,7 +198,7 @@ export function BetCard({
         </div>
         <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-[13px]">
           <span className="text-muted-foreground">@{formatNumber(Number(bet.odds), 2)}</span>
-          <span>{formatCurrency(Number(bet.stake_amount), currency)}</span>
+          <span>{formatCurrency(Number(bet.stake_amount), currency, unitValue)}</span>
           {clv != null && (
             <span className={cn("font-semibold", clv > 0 ? "positive" : clv < 0 ? "negative" : "")}>
               {clv > 0 ? "↑" : clv < 0 ? "↓" : ""} {formatPercent(clv)}
@@ -212,7 +212,7 @@ export function BetCard({
             net != null && net < 0 && "negative",
           )}
         >
-          {net != null ? formatCurrency(net, currency) : "—"}
+          {net != null ? formatCurrency(net, currency, unitValue) : "—"}
         </span>
         {quickActions("top-1/2 -translate-y-1/2 right-10")}
         {menu}
@@ -327,7 +327,7 @@ export function BetCard({
           label="Stake"
           value={
             <>
-              {formatCurrency(Number(bet.stake_amount), currency)}
+              {formatCurrency(Number(bet.stake_amount), currency, unitValue)}
               {units != null && (
                 <span className="text-muted-foreground"> · {formatNumber(units, 2)}u</span>
               )}
@@ -350,7 +350,7 @@ export function BetCard({
         {bet.ev != null && (
           <Metric
             label="EV"
-            value={formatCurrency(Number(bet.ev), currency)}
+            value={formatCurrency(Number(bet.ev), currency, unitValue)}
             tone={Number(bet.ev) > 0 ? "positive" : Number(bet.ev) < 0 ? "negative" : undefined}
             mono
           />
@@ -374,7 +374,7 @@ export function BetCard({
             net != null && net < 0 && "negative",
           )}
         >
-          {net != null ? formatCurrency(net, currency) : "—"}
+          {net != null ? formatCurrency(net, currency, unitValue) : "—"}
         </span>
       </div>
     </div>

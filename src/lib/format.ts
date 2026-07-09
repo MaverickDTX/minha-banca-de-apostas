@@ -1,5 +1,18 @@
-export function formatCurrency(value: number | null | undefined, currency = "BRL"): string {
+/** Formata um valor monetário (em R$, valor bruto do banco).
+ *  Quando currency === "u" e unitValue > 0, converte para unidades ("X.XX u").
+ *  Sem unitValue (ou <= 0) com currency "u", cai no formato monetário padrão. */
+export function formatCurrency(
+  value: number | null | undefined,
+  currency = "BRL",
+  unitValue?: number | null,
+): string {
   const v = Number(value ?? 0);
+  if (currency === "u") {
+    const uv = Number(unitValue ?? 0);
+    if (uv > 0) return `${(v / uv).toFixed(2)} u`;
+    // Sem unit_value definido: não há como converter — mostra o próprio número em u.
+    return `${v.toFixed(2)} u`;
+  }
   try {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -11,12 +24,14 @@ export function formatCurrency(value: number | null | undefined, currency = "BRL
   }
 }
 /** Valor monetário seguido da conversão em unidades: "R$ 50,00 (2.00 u)".
- *  Sem unit_value (nulo/zero), retorna apenas o valor em moeda. */
+ *  Sem unit_value (nulo/zero), retorna apenas o valor em moeda.
+ *  Quando currency já é "u", não duplica — retorna só "X.XX u". */
 export function formatWithUnits(
   value: number | null | undefined,
   currency: string,
   unitValue: number | null | undefined,
 ): string {
+  if (currency === "u") return formatCurrency(value, currency, unitValue);
   const rs = formatCurrency(value, currency);
   const uv = Number(unitValue ?? 0);
   if (!uv || uv <= 0) return rs;
@@ -63,6 +78,7 @@ export function toISODateInput(value: string | Date | null | undefined): string 
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
 /** Chave de dia (YYYY-MM-DD) no fuso LOCAL — evita deslocamento por UTC. */
 export function toLocalDateKey(value: string | Date | null | undefined): string {
   if (!value) return "";

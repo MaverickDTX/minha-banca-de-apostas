@@ -24,6 +24,8 @@ export type Insight = {
 
 export type InsightContext = {
   currency?: string;
+  /** Valor de 1 unidade em R$ — usado quando currency === "u". */
+  unitValue?: number;
   /** Referência temporal p/ janelas móveis — injetável p/ testes determinísticos. */
   now?: Date;
 };
@@ -78,7 +80,7 @@ export function bestMarketInsight(bets: Bet[], ctx: InsightContext = {}): Insigh
   return {
     id: "best-market",
     severity: "positive",
-    text: `"${best.key}" é seu mercado mais lucrativo: ${formatCurrency(best.metrics.netProfit, ctx.currency)} em ${best.metrics.settledBets} apostas (yield ${formatPercent(best.metrics.yield, 1)}).`,
+    text: `"${best.key}" é seu mercado mais lucrativo: ${formatCurrency(best.metrics.netProfit, ctx.currency, ctx.unitValue)} em ${best.metrics.settledBets} apostas (yield ${formatPercent(best.metrics.yield, 1)}).`,
   };
 }
 
@@ -94,7 +96,7 @@ export function worstMarketInsight(bets: Bet[], ctx: InsightContext = {}): Insig
   return {
     id: "worst-market",
     severity: "warning",
-    text: `"${worst.key}" é seu mercado com maior prejuízo: ${formatCurrency(worst.metrics.netProfit, ctx.currency)} em ${worst.metrics.settledBets} apostas.`,
+    text: `"${worst.key}" é seu mercado com maior prejuízo: ${formatCurrency(worst.metrics.netProfit, ctx.currency, ctx.unitValue)} em ${worst.metrics.settledBets} apostas.`,
   };
 }
 
@@ -110,7 +112,7 @@ export function bestBookmakerInsight(bets: Bet[], ctx: InsightContext = {}): Ins
   return {
     id: "best-bookmaker",
     severity: "positive",
-    text: `${best.key} é a casa onde você mais lucra: ${formatCurrency(best.metrics.netProfit, ctx.currency)} em ${best.metrics.settledBets} apostas.`,
+    text: `${best.key} é a casa onde você mais lucra: ${formatCurrency(best.metrics.netProfit, ctx.currency, ctx.unitValue)} em ${best.metrics.settledBets} apostas.`,
   };
 }
 
@@ -183,7 +185,7 @@ export function drawdownInsight(bets: Bet[], ctx: InsightContext = {}): Insight 
   return {
     id: "drawdown-recent",
     severity: "warning",
-    text: `Drawdown de ${formatCurrency(recent, ctx.currency)} nos últimos ${WINDOW_DAYS} dias — próximo do seu pior histórico (${formatCurrency(historical, ctx.currency)}). Atenção ao tamanho das stakes.`,
+    text: `Drawdown de ${formatCurrency(recent, ctx.currency, ctx.unitValue)} nos últimos ${WINDOW_DAYS} dias — próximo do seu pior histórico (${formatCurrency(historical, ctx.currency, ctx.unitValue)}). Atenção ao tamanho das stakes.`,
   };
 }
 

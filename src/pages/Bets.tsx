@@ -524,7 +524,7 @@ export default function Bets() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono">{formatNumber(Number(b.odds), 2)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(Number(b.stake_amount), currency)}</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(Number(b.stake_amount), currency, profile?.unit_value)}</TableCell>
                 <TableCell>
                   <StatusBadgePop status={b.status}>
                     <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
@@ -532,7 +532,7 @@ export default function Bets() {
                 </TableCell>
                 {/* whitespace-nowrap: o navegador quebra linha após o "-" de valores negativos. */}
                 <TableCell className={`text-right font-mono whitespace-nowrap ${Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : ""}`}>
-                  {b.status !== "pendente" && b.net_profit != null ? formatCurrency(Number(b.net_profit), currency) : "—"}
+                  {b.status !== "pendente" && b.net_profit != null ? formatCurrency(Number(b.net_profit), currency, profile?.unit_value) : "—"}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>

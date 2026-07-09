@@ -345,7 +345,7 @@ export function BetForm({
                   const u = parseFloat(e.target.value) || 0;
                   if (profile?.unit_value) setStake(+(u * profile.unit_value).toFixed(2));
                 }}
-                placeholder={profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, currency)}` : "—"}
+                placeholder={currency === "u" ? "" : profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, "BRL")}` : "—"}
               />
             </Field>
             {!isMultiple && (
@@ -491,7 +491,7 @@ export function BetForm({
                   const u = parseFloat(e.target.value) || 0;
                   if (profile?.unit_value) setStake(+(u * profile.unit_value).toFixed(2));
                 }}
-                placeholder={profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, currency)}` : "—"}
+                placeholder={currency === "u" ? "" : profile?.unit_value ? `1u = ${formatCurrency(profile.unit_value, "BRL")}` : "—"}
               />
             </Field>
 
@@ -548,15 +548,15 @@ export function BetForm({
       <div className="surface p-4 grid md:grid-cols-5 gap-3 text-sm">
         <Calc label="Prob. implícita" value={calc.effectiveOdds > 1 ? formatPercent(calc.implied) : "—"} />
         {/* Sem odd válida não há retorno/lucro a projetar — "—" evita o falso "-R$ 10,00". */}
-        <Calc label="Retorno potencial" value={calc.effectiveOdds > 1 ? formatCurrency(calc.potentialReturn, currency) : "—"} />
-        <Calc label="Lucro potencial" value={calc.effectiveOdds > 1 ? formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency) : "—"} />
+        <Calc label="Retorno potencial" value={calc.effectiveOdds > 1 ? formatCurrency(calc.potentialReturn, currency, profile?.unit_value) : "—"} />
+        <Calc label="Lucro potencial" value={calc.effectiveOdds > 1 ? formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency, profile?.unit_value) : "—"} />
         <Calc label="Stake / banca" value={formatPercent(calc.stakeOverBankrollPct)} tone={calc.stakeOverBankrollPct > (profile?.stake_warning_percent ?? 5) ? "negative" : "neutral"} />
         {calc.edge != null && <Calc label="Edge" value={formatPercent(calc.edge)} tone={calc.edge > 0 ? "positive" : "negative"} />}
-        {calc.ev != null && <Calc label="EV" value={formatCurrency(calc.ev, currency)} tone={calc.ev > 0 ? "positive" : "negative"} />}
+        {calc.ev != null && <Calc label="EV" value={formatCurrency(calc.ev, currency, profile?.unit_value)} tone={calc.ev > 0 ? "positive" : "negative"} />}
         {calc.kellyDec != null && <Calc label="Kelly decimal" value={formatPercent(calc.kellyDec * 100)} tone={calc.kellyDec < 0 ? "negative" : "positive"} />}
-        {calc.recommended != null && <Calc label={`Kelly stake (×${profile?.kelly_fraction ?? 0.25})`} value={formatCurrency(Math.max(0, calc.recommended), currency)} />}
+        {calc.recommended != null && <Calc label={`Kelly stake (×${profile?.kelly_fraction ?? 0.25})`} value={formatCurrency(Math.max(0, calc.recommended), currency, profile?.unit_value)} />}
         {calc.clv != null && <Calc label="CLV" value={formatPercent(calc.clv)} tone={calc.clv > 0 ? "positive" : "negative"} />}
-        <Calc label="Lucro líquido (calc)" value={calc.effectiveOdds > 1 ? formatCurrency(calc.net, currency) : "—"} tone={calc.net > 0 ? "positive" : calc.net < 0 ? "negative" : "neutral"} />
+        <Calc label="Lucro líquido (calc)" value={calc.effectiveOdds > 1 ? formatCurrency(calc.net, currency, profile?.unit_value) : "—"} tone={calc.net > 0 ? "positive" : calc.net < 0 ? "negative" : "neutral"} />
       </div>
 
       <div className="flex justify-end gap-2">

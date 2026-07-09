@@ -156,15 +156,15 @@ export default function BankrollPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
-        <StatCard label="Banca atual" value={formatCurrency(bank.current, currency)} icon={Wallet} />
-        <StatCard label="Banca inicial" value={formatCurrency(profile?.initial_bankroll ?? 0, currency)} icon={PiggyBank} />
-        <StatCard label="Lucro de apostas" value={formatCurrency(bank.betsProfit, currency)} icon={bank.betsProfit >= 0 ? TrendingUp : TrendingDown} tone={bank.betsProfit > 0 ? "positive" : bank.betsProfit < 0 ? "negative" : "neutral"} />
-        <StatCard label="Depósitos" value={formatCurrency(bank.deposits, currency)} icon={ArrowDownToLine} />
-        <StatCard label="Saques" value={formatCurrency(bank.withdrawals, currency)} icon={ArrowUpFromLine} />
-        <StatCard label="Bônus" value={formatCurrency(bank.bonuses, currency)} icon={Sparkles} />
+        <StatCard label="Banca atual" value={formatCurrency(bank.current, currency, profile?.unit_value)} icon={Wallet} />
+        <StatCard label="Banca inicial" value={formatCurrency(profile?.initial_bankroll ?? 0, currency, profile?.unit_value)} icon={PiggyBank} />
+        <StatCard label="Lucro de apostas" value={formatCurrency(bank.betsProfit, currency, profile?.unit_value)} icon={bank.betsProfit >= 0 ? TrendingUp : TrendingDown} tone={bank.betsProfit > 0 ? "positive" : bank.betsProfit < 0 ? "negative" : "neutral"} />
+        <StatCard label="Depósitos" value={formatCurrency(bank.deposits, currency, profile?.unit_value)} icon={ArrowDownToLine} />
+        <StatCard label="Saques" value={formatCurrency(bank.withdrawals, currency, profile?.unit_value)} icon={ArrowUpFromLine} />
+        <StatCard label="Bônus" value={formatCurrency(bank.bonuses, currency, profile?.unit_value)} icon={Sparkles} />
         <StatCard label="ROI sobre banca inicial" value={formatPercent(roiInitial)} icon={Target} tone={roiInitial > 0 ? "positive" : roiInitial < 0 ? "negative" : "neutral"} />
         <StatCard label="ROI sobre capital" value={formatPercent(roiCapital)} icon={Gauge} tone={roiCapital > 0 ? "positive" : roiCapital < 0 ? "negative" : "neutral"} hint={roiInitial === roiCapital ? "= banca inicial (sem depósitos)" : undefined} />
-        <StatCard label="Unidade atual" value={formatCurrency(profile?.unit_value ?? 0, currency)} icon={Ruler} hint={profile?.unit_mode === "percent" ? `${profile?.unit_percent}% da banca` : "Fixa"} />
+        <StatCard label="Unidade atual" value={formatCurrency(profile?.unit_value ?? 0, "BRL")} icon={Ruler} hint={profile?.unit_mode === "percent" ? `${profile?.unit_percent}% da banca` : "Fixa"} />
         <StatCard label="Apostas liquidadas" value={metrics.settledBets} icon={ListChecks} />
       </div>
 
@@ -252,7 +252,7 @@ export default function BankrollPage() {
                   <TableCell className="text-sm">{t.bookmaker || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{t.notes || "—"}</TableCell>
                   <TableCell className={`text-right font-mono ${isOut ? "negative" : "positive"}`}>
-                    {isOut ? "−" : "+"}{formatCurrency(Math.abs(Number(t.amount)), currency)}
+                    {isOut ? "−" : "+"}{formatCurrency(Math.abs(Number(t.amount)), currency, profile?.unit_value)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="icon" variant="ghost" aria-label="Excluir transação" onClick={() => setTxToDelete(t)}><Trash2 className="h-4 w-4" /></Button>
@@ -271,7 +271,7 @@ export default function BankrollPage() {
             <AlertDialogDescription>
               {txToDelete && (
                 <>
-                  {TX_LABELS[txToDelete.tx_type]} de {formatCurrency(Math.abs(Number(txToDelete.amount)), currency)} em {formatDateTime(txToDelete.tx_date)}. Esta ação não pode ser desfeita e altera a composição da banca.
+                  {TX_LABELS[txToDelete.tx_type]} de {formatCurrency(Math.abs(Number(txToDelete.amount)), currency, profile?.unit_value)} em {formatDateTime(txToDelete.tx_date)}. Esta ação não pode ser desfeita e altera a composição da banca.
                 </>
               )}
             </AlertDialogDescription>

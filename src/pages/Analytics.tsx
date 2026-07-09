@@ -265,7 +265,7 @@ export default function Analytics() {
         <div className="ml-auto text-xs text-muted-foreground">
           <CountUp value={m.totalBets} format={(n) => formatNumber(n, 0)} /> apostas · Lucro{" "}
           <span className={m.netProfit >= 0 ? "positive font-mono" : "negative font-mono"}>
-            <CountUp value={m.netProfit} format={(n) => formatCurrency(n, currency)} />
+            <CountUp value={m.netProfit} format={(n) => formatCurrency(n, currency, profile?.unit_value)} />
           </span>{" "}
           · Yield <span className="font-mono"><CountUp value={m.yield} format={(n) => formatPercent(n)} /></span>
         </div>
@@ -370,17 +370,17 @@ export default function Analytics() {
             <TabsTrigger value="timing">Pré × Live</TabsTrigger>
             <TabsTrigger value="tipo">Simples × Múltiplas</TabsTrigger>
           </TabsList>
-          <TabsContent value="esporte"><GroupTable rows={bySport} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="liga"><GroupTable rows={byLeague} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="mercado"><GroupTable rows={byMarket} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="casa"><GroupTable rows={byBook} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="odds"><GroupTable rows={byOdds} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="dia"><GroupTable rows={byDay} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="mes"><GroupTable rows={byMonth} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="tag"><GroupTable rows={byTag} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="tipster"><GroupTable rows={byTipster} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="timing"><GroupTable rows={byTiming} currency={currency} highlightKey={group} /></TabsContent>
-          <TabsContent value="tipo"><GroupTable rows={byType} currency={currency} highlightKey={group} /></TabsContent>
+          <TabsContent value="esporte"><GroupTable rows={bySport} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="liga"><GroupTable rows={byLeague} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="mercado"><GroupTable rows={byMarket} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="casa"><GroupTable rows={byBook} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="odds"><GroupTable rows={byOdds} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="dia"><GroupTable rows={byDay} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="mes"><GroupTable rows={byMonth} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tag"><GroupTable rows={byTag} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tipster"><GroupTable rows={byTipster} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="timing"><GroupTable rows={byTiming} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tipo"><GroupTable rows={byType} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
         </Tabs>
       </motion.div>
     </div>
@@ -390,10 +390,12 @@ export default function Analytics() {
 function GroupTable({
   rows,
   currency,
+  unitValue,
   highlightKey,
 }: {
   rows: { key: string; metrics: ReturnType<typeof computeMetrics> }[];
   currency: string;
+  unitValue?: number;
   highlightKey?: string;
 }) {
   return (
@@ -428,20 +430,20 @@ function GroupTable({
             >
               <TableCell className="font-medium">{r.key}</TableCell>
               <TableCell className="text-right">{r.metrics.totalBets}</TableCell>
-              <TableCell className="text-right font-mono">{formatCurrency(r.metrics.stakeTotal, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{formatCurrency(r.metrics.stakeTotal, currency, unitValue)}</TableCell>
               <TableCell className={`text-right font-mono ${r.metrics.netProfit > 0 ? "positive" : r.metrics.netProfit < 0 ? "negative" : ""}`}>
-                {formatCurrency(r.metrics.netProfit, currency)}
+                {formatCurrency(r.metrics.netProfit, currency, unitValue)}
               </TableCell>
               <TableCell className={`text-right font-mono ${r.metrics.yield > 0 ? "positive" : r.metrics.yield < 0 ? "negative" : ""}`}>
                 {formatPercent(r.metrics.yield)}
               </TableCell>
               <TableCell className="text-right font-mono">{formatPercent(r.metrics.hitRate, 1)}</TableCell>
               <TableCell className="text-right font-mono">{formatNumber(r.metrics.avgOdds, 2)}</TableCell>
-              <TableCell className="text-right font-mono">{formatCurrency(r.metrics.avgStake, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{formatCurrency(r.metrics.avgStake, currency, unitValue)}</TableCell>
               <TableCell className="text-right font-mono">{r.metrics.clvCount > 0 ? formatPercent(r.metrics.avgClv) : "—"}</TableCell>
-              <TableCell className="text-right font-mono">{r.metrics.evCount > 0 ? formatCurrency(r.metrics.avgEv, currency) : "—"}</TableCell>
-              <TableCell className="text-right font-mono positive">{formatCurrency(r.metrics.bestGreen, currency)}</TableCell>
-              <TableCell className="text-right font-mono negative">{formatCurrency(r.metrics.worstRed, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{r.metrics.evCount > 0 ? formatCurrency(r.metrics.avgEv, currency, unitValue) : "—"}</TableCell>
+              <TableCell className="text-right font-mono positive">{formatCurrency(r.metrics.bestGreen, currency, unitValue)}</TableCell>
+              <TableCell className="text-right font-mono negative">{formatCurrency(r.metrics.worstRed, currency, unitValue)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

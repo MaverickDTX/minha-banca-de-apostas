@@ -93,7 +93,7 @@ export default function Dashboard() {
   }, [chartDays]);
 
   const metrics = useMemo(() => computeMetrics(bets), [bets]);
-  const insights = useMemo(() => computeInsights(bets, { currency }).slice(0, 5), [bets, currency]);
+  const insights = useMemo(() => computeInsights(bets, { currency, unitValue: profile?.unit_value }).slice(0, 5), [bets, currency, profile?.unit_value]);
   const bank = useMemo(() => computeBankroll(Number(profile?.initial_bankroll ?? 0), bets, txs), [bets, txs, profile]);
   const initialBankroll = Number(profile?.initial_bankroll ?? 0);
   const roi = initialBankroll > 0 ? (bank.betsProfit / initialBankroll) * 100 : 0;
@@ -200,7 +200,7 @@ export default function Dashboard() {
   const monthDelta = monthProfit - prevMonthProfit;
   const monthHint =
     prevMonthBets.length > 0
-      ? `${monthDelta >= 0 ? "↑" : "↓"} ${formatCurrency(Math.abs(monthDelta), currency)} vs mês anterior`
+      ? `${monthDelta >= 0 ? "↑" : "↓"} ${formatCurrency(Math.abs(monthDelta), currency, profile?.unit_value)} vs mês anterior`
       : undefined;
 
   const streakTo =
@@ -245,20 +245,20 @@ export default function Dashboard() {
         </div>
       ) : (
         <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
-          <motion.div variants={fadeUp}><StatCard size="lg" label="Banca atual" value={<CountUp value={bank.current} format={(n) => formatCurrency(n, currency)} />} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency)}`} to="/bankroll" /></motion.div>
-          <motion.div variants={fadeUp}><StatCard size="lg" label="Lucro / prejuízo" value={<CountUp value={metrics.netProfit} format={(n) => formatCurrency(n, currency)} />} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="Banca atual" value={<CountUp value={bank.current} format={(n) => formatCurrency(n, currency, profile?.unit_value)} />} icon={Wallet} hint={`Inicial ${formatCurrency(profile?.initial_bankroll ?? 0, currency, profile?.unit_value)}`} to="/bankroll" /></motion.div>
+          <motion.div variants={fadeUp}><StatCard size="lg" label="Lucro / prejuízo" value={<CountUp value={metrics.netProfit} format={(n) => formatCurrency(n, currency, profile?.unit_value)} />} icon={metrics.netProfit >= 0 ? TrendingUp : TrendingDown} tone={metrics.netProfit > 0 ? "positive" : metrics.netProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
           <motion.div variants={fadeUp}><StatCard size="lg" label="ROI" value={<CountUp value={roi} format={(n) => formatPercent(n)} />} icon={Target} hint="sobre banca inicial" info="Retorno sobre a banca inicial: lucro total das apostas dividido pelo capital de partida." tone={roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ dateRange: "current" })} /></motion.div>
           <motion.div variants={fadeUp}><StatCard size="lg" label="Yield" value={<CountUp value={metrics.yield} format={(n) => formatPercent(n)} />} icon={Activity} info="Lucro dividido pelo total apostado (turnover). Mede a eficiência por real arriscado — 5%+ sustentado é forte." tone={metrics.yield > 0 ? "positive" : metrics.yield < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ tab: "mercado" })} /></motion.div>
         </motion.div>
       )}
 
       <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
-        <motion.div variants={fadeUp}><StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency)} icon={Banknote} to={buildAnalyticsUrl()} /></motion.div>
+        <motion.div variants={fadeUp}><StatCard label="Total apostado" value={formatCurrency(metrics.stakeTotal, currency, profile?.unit_value)} icon={Banknote} to={buildAnalyticsUrl()} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Apostas" value={formatNumber(metrics.totalBets, 0)} icon={ListChecks} hint={`${metrics.settledBets} liquidadas · ${metrics.pendingBets} pendentes`} to={buildAnalyticsUrl()} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Taxa de acerto" value={formatPercent(metrics.hitRate, 1)} icon={Percent} info="Apostas ganhas sobre o total decidido (voids e pendentes fora). Sozinha não diz lucro — depende das odds." to={buildAnalyticsUrl({ view: "winrate" })} /></motion.div>
         <motion.div variants={fadeUp}><StatCard label="Odd média" value={formatNumber(metrics.avgOdds, 2)} icon={Dices} to={buildAnalyticsUrl({ tab: "odds" })} /></motion.div>
-        <motion.div variants={fadeUp}><StatCard label="Stake média" value={formatCurrency(metrics.avgStake, currency)} icon={Coins} to={buildAnalyticsUrl({ minStake: Math.round(metrics.avgStake) })} /></motion.div>
-        <motion.div variants={fadeUp}><StatCard label="Maior drawdown" value={formatCurrency(metrics.maxDrawdown, currency)} icon={TrendingDown} info="Maior queda acumulada desde um pico de lucro. Mede o pior momento da banca — quanto menor, mais estável." tone="negative" to={buildAnalyticsUrl()} /></motion.div>
+        <motion.div variants={fadeUp}><StatCard label="Stake média" value={formatCurrency(metrics.avgStake, currency, profile?.unit_value)} icon={Coins} to={buildAnalyticsUrl({ minStake: Math.round(metrics.avgStake) })} /></motion.div>
+        <motion.div variants={fadeUp}><StatCard label="Maior drawdown" value={formatCurrency(metrics.maxDrawdown, currency, profile?.unit_value)} icon={TrendingDown} info="Maior queda acumulada desde um pico de lucro. Mede o pior momento da banca — quanto menor, mais estável." tone="negative" to={buildAnalyticsUrl()} /></motion.div>
         <motion.div variants={fadeUp}>
           <StatCard
             label="Sequência atual"
@@ -268,7 +268,7 @@ export default function Dashboard() {
             to={streakTo}
           />
         </motion.div>
-        <motion.div variants={fadeUp}><StatCard label="Resultado do mês" value={formatCurrency(monthProfit, currency)} icon={CalendarDays} hint={monthHint} tone={monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ start: monthRange.start, end: monthRange.end })} /></motion.div>
+        <motion.div variants={fadeUp}><StatCard label="Resultado do mês" value={formatCurrency(monthProfit, currency, profile?.unit_value)} icon={CalendarDays} hint={monthHint} tone={monthProfit > 0 ? "positive" : monthProfit < 0 ? "negative" : "neutral"} to={buildAnalyticsUrl({ start: monthRange.start, end: monthRange.end })} /></motion.div>
       </motion.div>
 
       {insights.length > 0 && (
