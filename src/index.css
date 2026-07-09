@@ -25,7 +25,7 @@
     --muted: 220 16% 94%;
     --muted-foreground: 220 10% 42%;
 
-    --accent: 197 90% 48%;
+    --accent: 197 90% 48%; /* ciano — quantidades neutras (contagens, composição); verde/vermelho = dinheiro/resultado */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 78% 56%;
@@ -73,7 +73,7 @@
     /* 71% (era 64%): contraste dos secundários apontado pelas 2 avaliações heurísticas. */
     --muted-foreground: 262 9% 71%;
 
-    --accent: 197 90% 56%;
+    --accent: 197 90% 56%; /* ciano — quantidades neutras (contagens, composição); verde/vermelho = dinheiro/resultado */
     --accent-foreground: 222 40% 6%;
 
     --destructive: 0 78% 58%;

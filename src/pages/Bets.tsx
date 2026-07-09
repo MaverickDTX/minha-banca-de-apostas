@@ -381,12 +381,12 @@ export default function Bets() {
         </Popover>
 
         <Select value={String(pageSize)} onValueChange={(val) => updateParam("size", val)}>
-          <SelectTrigger className="w-[110px]"><SelectValue placeholder="Itens/pág" /></SelectTrigger>
+          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Itens/pág" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="20">20 por pág.</SelectItem>
-            <SelectItem value="50">50 por pág.</SelectItem>
-            <SelectItem value="70">70 por pág.</SelectItem>
-            <SelectItem value="100">100 por pág.</SelectItem>
+            <SelectItem value="20">20/pág</SelectItem>
+            <SelectItem value="50">50/pág</SelectItem>
+            <SelectItem value="70">70/pág</SelectItem>
+            <SelectItem value="100">100/pág</SelectItem>
           </SelectContent>
         </Select>
           {(q || status !== "all" || sport !== "all" || bookmaker !== "all" || advancedActive) && (

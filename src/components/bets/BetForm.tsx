@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 import {
   recomputeBetDerived,
   clvPercent,
@@ -319,7 +321,7 @@ export function BetForm({
                   />
                 </Field>
                 <Field label="Odd">
-                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
+                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} placeholder="Ex: 1.85" />
                 </Field>
                 <Field label="Tipster" className="md:col-span-2">
                   <TipsterAutocomplete value={tipster} onChange={setTipster} />
@@ -327,8 +329,11 @@ export function BetForm({
               </>
             )}
 
-            <Field label={`Stake (${currency})`}>
-              <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
+            <Field label="Stake">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">{currency === "USD" ? "US$" : currency === "EUR" ? "€" : "R$"}</span>
+                <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} className="pl-9" />
+              </div>
             </Field>
             <Field label="Unidades">
               <Input
@@ -366,12 +371,20 @@ export function BetForm({
                   className="data-[state=checked]:bg-blue-500"
                   id="keep-event-info"
                 />
-                <Label
-                  htmlFor="keep-event-info"
-                  className="text-xs text-muted-foreground cursor-pointer"
-                >
-                  Manter informações do evento
-                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label
+                      htmlFor="keep-event-info"
+                      className="text-xs text-muted-foreground cursor-pointer inline-flex items-center gap-1"
+                    >
+                      Manter informações do evento
+                      <HelpCircle className="h-3 w-3 opacity-60" />
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[240px] text-xs leading-relaxed">
+                    Preserva evento/esporte/liga para a próxima aposta.
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
             {!isMultiple && (
@@ -455,15 +468,18 @@ export function BetForm({
                   />
                 </Field>
                 <Field label="Odd apostada">
-                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} />
+                  <Input type="number" step="0.001" min={1.01} value={odds || ""} onChange={(e) => setOdds(parseFloat(e.target.value) || 0)} placeholder="Ex: 1.85" />
                 </Field>
               </>
             )}
             <Field label="Closing odd">
               <Input type="number" step="0.001" min={1.01} value={closing_odds ?? ""} onChange={(e) => setClosingOdds(e.target.value ? parseFloat(e.target.value) : undefined)} />
             </Field>
-            <Field label={`Stake (${currency})`}>
-              <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} />
+            <Field label="Stake">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">{currency === "USD" ? "US$" : currency === "EUR" ? "€" : "R$"}</span>
+                <Input type="number" step="0.01" min={0} value={stake_amount || ""} onChange={(e) => setStake(parseFloat(e.target.value) || 0)} className="pl-9" />
+              </div>
             </Field>
             <Field label="Unidades">
               <Input
@@ -529,8 +545,8 @@ export function BetForm({
         </TabsContent>
       </Tabs>
 
-      <div className="surface p-4 grid md:grid-cols-4 gap-3 text-sm">
-        <Calc label="Prob. implícita" value={formatPercent(calc.implied)} />
+      <div className="surface p-4 grid md:grid-cols-5 gap-3 text-sm">
+        <Calc label="Prob. implícita" value={calc.effectiveOdds > 1 ? formatPercent(calc.implied) : "—"} />
         {/* Sem odd válida não há retorno/lucro a projetar — "—" evita o falso "-R$ 10,00". */}
         <Calc label="Retorno potencial" value={calc.effectiveOdds > 1 ? formatCurrency(calc.potentialReturn, currency) : "—"} />
         <Calc label="Lucro potencial" value={calc.effectiveOdds > 1 ? formatCurrency(stake_amount * (calc.effectiveOdds - 1), currency) : "—"} />
@@ -540,7 +556,7 @@ export function BetForm({
         {calc.kellyDec != null && <Calc label="Kelly decimal" value={formatPercent(calc.kellyDec * 100)} tone={calc.kellyDec < 0 ? "negative" : "positive"} />}
         {calc.recommended != null && <Calc label={`Kelly stake (×${profile?.kelly_fraction ?? 0.25})`} value={formatCurrency(Math.max(0, calc.recommended), currency)} />}
         {calc.clv != null && <Calc label="CLV" value={formatPercent(calc.clv)} tone={calc.clv > 0 ? "positive" : "negative"} />}
-        <Calc label="Lucro líquido (calc)" value={formatCurrency(calc.net, currency)} tone={calc.net > 0 ? "positive" : calc.net < 0 ? "negative" : "neutral"} />
+        <Calc label="Lucro líquido (calc)" value={calc.effectiveOdds > 1 ? formatCurrency(calc.net, currency) : "—"} tone={calc.net > 0 ? "positive" : calc.net < 0 ? "negative" : "neutral"} />
       </div>
 
       <div className="flex justify-end gap-2">

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { Link } from "react-router-dom";
 import { useTelegramLink, useGenerateLinkCode, useUnlinkTelegram } from "@/hooks/useTelegramLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookmakerSelect } from "@/components/bookmakers/BookmakerSelect";
-import { Sun, Moon } from "lucide-react";
+import { FileUp, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { DUR, EASE, RISE } from "@/lib/motion";
@@ -431,6 +432,16 @@ export default function SettingsPage() {
                 )}
               </div>
             )}
+          </Box>
+
+          <Box title="Importar / Exportar">
+            <p className="text-sm text-muted-foreground mb-3">Exporte seus dados ou importe apostas em lote via CSV.</p>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/importar">
+                <FileUp className="h-4 w-4 mr-2" />
+                Ir para Importar / Exportar
+              </Link>
+            </Button>
           </Box>
 
           <Box title="Aparência">
