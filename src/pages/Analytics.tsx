@@ -17,7 +17,7 @@ import {
   type AnalyticsTab,
 } from "@/lib/analyticsUrl";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import { formatCurrency, formatNumber, formatPercent, formatWithUnits } from "@/lib/format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +132,22 @@ export default function Analytics() {
   const settled = filtered.filter((b) => isSettled(b.status));
   const contentKey = `${preset}-${from}-${to}-${status}-${tab}-${group}-${minStake}`;
 
+  const filteredSemStatus = useMemo(() => {
+    let rows = bets.filter((b) => {
+      const t = new Date(b.bet_date).getTime();
+      if (from && t < new Date(from).getTime()) return false;
+      if (to && t > new Date(to).getTime() + 86400000) return false;
+      if (minStake && Number(b.stake_amount) < Number(minStake)) return false;
+      return true;
+    });
+    if (group) {
+      rows = rows.filter((b) => betMatchesGroup(b, tab, group));
+    }
+    return rows;
+  }, [bets, from, to, tab, group, minStake]);
+
+  const settledSemStatus = filteredSemStatus.filter((b) => isSettled(b.status));
+
   const grouping = (rows: { key: string; bets: typeof bets; metrics: ReturnType<typeof computeMetrics> }[]) =>
     rows.sort((a, b) => b.metrics.netProfit - a.metrics.netProfit);
 
@@ -153,7 +169,7 @@ export default function Analytics() {
   const byType = grouping(groupBy(settled, (b) => b.bet_type));
 
   const cumChart = useMemo(() => {
-    const ordered = settled.slice().sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
+    const ordered = settledSemStatus.slice().sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
     let cum = 0;
     let peak = 0;
     const byDayMap = new Map<number, { lucro: number; drawdown: number }>();
@@ -170,7 +186,7 @@ export default function Analytics() {
       });
     }
     return Array.from(byDayMap, ([t, v]) => ({ t, ...v }));
-  }, [settled]);
+  }, [settledSemStatus]);
 
   const oddsHist = useMemo(() => {
     const map = new Map<string, number>();
@@ -264,7 +280,7 @@ export default function Analytics() {
       >
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="surface p-4 lg:col-span-2">
-            <h3 className="text-sm font-semibold mb-3">Lucro acumulado & drawdown</h3>
+            <h3 className="text-sm font-semibold mb-3">Lucro líquido acumulado & drawdown</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={cumChart}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
@@ -284,7 +300,7 @@ export default function Analytics() {
                   contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                   labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  formatter={(v: number) => formatCurrency(v, currency)}
+                  formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)}
                   labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
                 />
                 <Line isAnimationActive={!reduce} type="monotone" dataKey="lucro" name="Lucro" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
@@ -320,7 +336,7 @@ export default function Analytics() {
                   contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                   labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  formatter={(v: number) => formatCurrency(v, currency)}
+                  formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)}
                 />
                 <Scatter isAnimationActive={!reduce} data={scatter}>
                   {scatter.map((p, i) => (

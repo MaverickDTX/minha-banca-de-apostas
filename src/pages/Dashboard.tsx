@@ -11,7 +11,7 @@ import { buildAnalyticsUrl, currentMonthRange, getBetGroupKey } from "@/lib/anal
 import { formatCurrency, formatNumber, formatPercent, formatWithUnits } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays, AlertTriangle, Info, Lightbulb } from "lucide-react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell, Legend, PieChart, Pie } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 import { cn } from "@/lib/utils";
@@ -152,11 +152,27 @@ export default function Dashboard() {
   const statusBreak = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) m.set(b.status, (m.get(b.status) ?? 0) + 1);
-    return Array.from(m.entries()).map(([k, v]) => ({
-      status: STATUS_LABELS[k as keyof typeof STATUS_LABELS] ?? k,
-      count: v,
-      key: k,
-    }));
+    const ORDER: Array<{ key: string; color: string }> = [
+      { key: "green", color: "hsl(var(--success))" },
+      { key: "half_green", color: "hsl(var(--success))" },
+      { key: "red", color: "hsl(var(--destructive))" },
+      { key: "half_red", color: "hsl(var(--destructive))" },
+      { key: "cashout", color: "hsl(var(--accent))" },
+      { key: "void", color: "hsl(var(--muted-foreground))" },
+      { key: "pendente", color: "hsl(var(--muted-foreground))" },
+    ];
+    const total = bets.length || 1;
+    const segments = ORDER
+      .filter((o) => (m.get(o.key) ?? 0) > 0)
+      .map((o) => ({
+        key: o.key,
+        color: o.color,
+        label: STATUS_LABELS[o.key as keyof typeof STATUS_LABELS] ?? o.key,
+        count: m.get(o.key) ?? 0,
+      }));
+    const row: Record<string, number | string> = { name: "status" };
+    for (const s of segments) row[s.key] = (s.count / total) * 100;
+    return { segments, row: [row], total };
   }, [bets]);
 
   const bySport = useMemo(
@@ -316,33 +332,39 @@ export default function Dashboard() {
 
         <ChartCard title="Status das apostas">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={statusBreak}>
-              <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-              <XAxis dataKey="status" stroke="hsl(var(--muted-foreground))" fontSize={10} interval={0} tickFormatter={(v: string) => v === "Meio Ganha" ? "Meio G." : v === "Meio Perdida" ? "Meio P." : v} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
-              <Bar
-                dataKey="count"
-                name="Apostas"
-                radius={[4, 4, 0, 0]}
-                className="cursor-pointer"
-                onClick={(data: { key?: string }) => {
-                  if (data?.key) navigate(buildAnalyticsUrl({ status: data.key }));
+            <PieChart>
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                formatter={(value: number, _n: string, entry: { payload?: { key?: string; label?: string; count?: number } }) => {
+                  const p = entry?.payload;
+                  const pct = ((p?.count ?? 0) / statusBreak.total) * 100;
+                  return [`${p?.count ?? 0} (${pct.toFixed(1)}%)`, p?.label ?? ""];
                 }}
+              />
+              <Legend
+                verticalAlign="bottom"
+                formatter={(_value: string, entry: { payload?: { label?: string } }) => entry?.payload?.label ?? ""}
+                wrapperStyle={{ fontSize: 11 }}
+              />
+              <Pie
+                data={statusBreak.segments}
+                dataKey="count"
+                nameKey="label"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={90}
+                paddingAngle={2}
+                isAnimationActive={!reduce}
+                onClick={(d: { key?: string }) => { if (d?.key) navigate(buildAnalyticsUrl({ status: d.key })); }}
+                className="cursor-pointer"
               >
-                {statusBreak.map((s) => (
-                  <Cell
-                    key={s.key}
-                    fill={
-                      s.key === "green" || s.key === "half_green" ? "hsl(var(--success))" :
-                      s.key === "red" || s.key === "half_red" ? "hsl(var(--destructive))" :
-                      s.key === "cashout" ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))"
-                    }
-                    className="motion-safe:transition-opacity motion-safe:duration-150 hover:opacity-100 opacity-90"
-                  />
+                {statusBreak.segments.map((s) => (
+                  <Cell key={s.key} fill={s.color} stroke="hsl(var(--background))" strokeWidth={2} />
                 ))}
-              </Bar>
-            </BarChart>
+              </Pie>
+            </PieChart>
           </ResponsiveContainer>
         </ChartCard>
 

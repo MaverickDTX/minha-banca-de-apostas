@@ -179,7 +179,7 @@ export default function BankrollPage() {
             <Tooltip
               contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
               formatter={(_v: number, _n: string, item: { payload?: { delta: number } }) =>
-                formatCurrency(item?.payload?.delta ?? 0, currency)
+                formatWithUnits(item?.payload?.delta ?? 0, currency, profile?.unit_value)
               }
               labelFormatter={(l: string) => l}
               cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }}
