@@ -30,6 +30,7 @@ dist-ssr
 
 # Arquivos temporários do Vite (config timestamps)
 vite.config.ts.timestamp-*.mjs
+vitest.config.ts.timestamp-*.mjs
 
 # Visual Studio
 .vs/
