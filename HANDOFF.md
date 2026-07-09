@@ -325,7 +325,7 @@ Cards de Casas de Aposta e Tipsters mostravam chips imediatamente ao adicionar, 
 
 ## ✅ Sessão 2026-07-07 — Bot Telegram: fix de posse no callback + kill-switch /pausar (deployado, aguardando commit)
 
-Contexto: o bot Telegram (edge function `telegram-webhook`, migration `20260706120000_telegram_bot.sql`, detalhes em `PROMPT-TELEGRAM-BOT.md`) foi criado em 06/07 e não estava registrado neste handoff. Fluxo: foto/texto → Gemini (cadeia de providers em `providers.ts`) → resumo + botões Confirmar/Corrigir/Cancelar → RPC `create_bet_from_telegram`. Auth do webhook via `X-Telegram-Bot-Api-Secret-Token`. Gate de uso: `resolveUser(chatId)` exige vínculo em `telegram_links` (via `/vincular CODIGO` gerado no app) antes de qualquer chamada ao Gemini — funciona como allowlist estrutural.
+Contexto: o bot Telegram (edge function `telegram-webhook`, migration `20260706120000_telegram_bot.sql`) foi criado em 06/07 e não estava registrado neste handoff. Fluxo: foto/texto → Gemini (cadeia de providers em `providers.ts`) → resumo + botões Confirmar/Corrigir/Cancelar → RPC `create_bet_from_telegram`. Auth do webhook via `X-Telegram-Bot-Api-Secret-Token`. Gate de uso: `resolveUser(chatId)` exige vínculo em `telegram_links` (via `/vincular CODIGO` gerado no app) antes de qualquer chamada ao Gemini — funciona como allowlist estrutural.
 
 ### Fix: callback query sem verificação de posse
 `handleCallbackQuery` buscava o pending só por `id` — um chat vinculado que conhecesse o UUID de um pending alheio podia confirmá-lo/alterá-lo/cancelá-lo. Agora a busca filtra `id` + `chat_id` uma única vez no topo, cobrindo os 3 branches (c/e/x).
