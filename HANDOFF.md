@@ -2,7 +2,40 @@
 
 Data: 2026-07-09 (última atualização; histórico abaixo)
 
-## ✅ Sessão 2026-07-09 — P-A tooltip scroll/dismiss + P-C guard viewport /inicio + P-D logo clicável
+## ✅ Sessão 2026-07-09 (2) — P-E calendário mobile + P-F stat-value responsivo + P-G varredura overflow
+
+### P-E — Calendário quebrado no mobile
+- `src/pages/Calendar.tsx` L98-106: bloco de valor em R$ envolto em `hidden sm:block` — no mobile (< sm) só aparece dia + cor + contagem; o valor completo já está no Dialog ao tocar.
+- Adicionado `overflow-hidden` e `min-w-0` na célula do calendário para segurança.
+
+### P-F — Card "Total Apostado" (stat-value) responsivo
+- `src/index.css` L157: `.stat-value` alterado de `text-2xl` fixo para `text-xl md:text-2xl` — 20px mobile, 24px desktop.
+- `src/components/StatCard.tsx`: adicionado `min-w-0 overflow-hidden` no container do card, `min-w-0` no flex header, e `tabular-nums` no bloco do valor.
+- Cobre todos os cards do Dashboard (primários e secundários) e de Banca.
+
+### P-G — Varredura overflow mobile a 338px
+Telas conferidas (nenhuma exigiu correção além do StatCard que já cobre P-F):
+- **Apostas** (`Bets.tsx`): cards via `<BetCard>` com fontes pequenas (`text-[13px]`) em grid flexível; tabela em `overflow-x-auto`. Sem `text-2xl`/monetary overflow.
+- **Banca** (`Bankroll.tsx`): KPIs via `<StatCard>` (coberto pelo P-F); tabela em `overflow-x-auto`; waterfall via `ResponsiveContainer`.
+- **Nova aposta** (`NewBet.tsx`/`BetForm.tsx`): form em `max-w-5xl` com inputs/painel calculado em `text-sm`; grid `md:grid-cols-5` flexível.
+- **Análises** (`Analytics.tsx`): KPIs via `<StatCard>` (coberto pelo P-F); tooltip fix aplicado na sessão anterior.
+
+### Arquivos alterados
+- `src/pages/Calendar.tsx`
+- `src/index.css`
+- `src/components/StatCard.tsx`
+
+### Verificação
+- `tsc --noEmit` OK, `vitest run` (109/109) OK.
+- Teste real a 338px: calendário alinhado (R$ oculto no mobile, visível no Dialog); nenhum valor de KPI ultrapassa borda; tocar dia abre detalhe.
+
+### Estado de commit
+- **Aguardando commit**: Calendar.tsx, index.css, StatCard.tsx + arquivos da sessão anterior (use-media-query.ts, MobileGate.tsx, App.tsx, Dashboard.tsx, Analytics.tsx, AppSidebar.tsx, HANDOFF.md).
+- Verificação: `tsc --noEmit` + `vitest run` (109/109) OK.
+- **Passo 0 (login)**: confirmado — `teste@teste.com` / `teste` acessa `/auth`, Dashboard carrega dados reais.
+- Commitar pelo Windows (regra FUSE).
+
+## ✅ Sessão 2026-07-09 (1) — P-A tooltip scroll/dismiss + P-C guard viewport /inicio + P-D logo clicável
 
 ### P-A · Tooltip recharts — dismiss por scroll/touchmove + timeout 4s (Dashboard + Análises)
 Implementadas as duas correções combinadas conforme decisão do HANDOFF:
@@ -109,12 +142,54 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 1. **[RESOLVIDO 2026-07-09] P-A — Tooltip do recharts preso no mobile** — fix com scroll/touchmove + timeout 4s (Dashboard + Análises).
 1b. **[RESOLVIDO 2026-07-09] P-C — Grid 3×2 (`/inicio`) vazando para o desktop** — guard de viewport redireciona desktop para `/`.
 1c. **[RESOLVIDO 2026-07-09] P-D — Logo "Bankroll Pro" clicável → Home** — Link com rota responsiva.
-2. Teste mobile real das demais telas (Apostas, Análises, Banca, Nova aposta).
+2. **[RESOLVIDO 2026-07-09] P-E — Calendário quebrado no mobile** — valor R$ oculto abaixo de sm.
+3. **[RESOLVIDO 2026-07-09] P-F — Card "Total Apostado" vaza no mobile** — `.stat-value` responsivo + min-w-0.
+4. **[RESOLVIDO 2026-07-09] P-G — Varredura overflow mobile** — todas as telas conferidas: OK, cobertas por StatCard ou overflow-x-auto.
 5. #26 constantes duplicadas (`DAY_NAMES` em 3 arquivos, `CHART_RANGES`/`PRESETS` em 2), #33 lint `unused-imports`, #32 tipos gerados não usados, #34 docs antigos, #35 tema claro com hue antigo.
 6. #15b apagar conta (exige Edge Function com service role + confirmação forte).
 7. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
 
 ## 🔧 PENDÊNCIAS NOVAS (2026-07-08, aguardando execução)
+
+### ✅ P-E · Calendário quebrado no mobile — RESOLVIDO 2026-07-09
+**RESOLVIDO:** valor R$ oculto no mobile (`hidden sm:block`), `overflow-hidden` na célula. Ver sessão 2026-07-09 (2).
+Registro histórico:
+**Sintoma (screenshot 338px):** os valores em R$ das células colam uns nos outros ("R$ 34,20R$ 25,20R$ 29,65"), as células esticam verticalmente e o grid inteiro desalinha — "todo doido".
+
+**Causa (`src/pages/Calendar.tsx` L86-108):** cada dia é um `<button aspect-square>` num `grid grid-cols-7 gap-2`. A 338px, após os paddings (page `p-4` + surface `p-4`) e 6 gaps, cada célula fica com **~32px de largura**. Dentro renderiza `formatCurrency(profit)` (ex.: "R$ 34,20") em `text-xs` (12px) — **impossível caber num quadrado de 32px**. O texto (mono, sem `truncate`/`overflow-hidden`) transborda horizontalmente para a célula vizinha e força altura, quebrando o `aspect-square` e o alinhamento do grid.
+
+**Correção (decisão de design — recomendo a opção 1):**
+1. **No mobile, não mostrar o valor em R$ dentro da célula.** Exibir só: número do dia + cor (verde/vermelho já indica lucro/prejuízo) + opcionalmente a contagem de apostas. O valor completo já aparece no **Dialog ao tocar o dia** (já existe, L116-136). Ex.: `hidden sm:block` no bloco de valor; manter dia + cor sempre.
+2. Alternativa: abreviar o valor no mobile ("+34" / "−26") em vez de "R$ 34,20", com `text-[10px]` e `tabular-nums`.
+3. Em qualquer caso: adicionar `overflow-hidden` na célula e `min-w-0` para o texto nunca vazar para a vizinha; considerar soltar o `aspect-square` no mobile (min-height em vez de quadrado) se a contagem também não couber.
+
+**Arquivo-alvo:** `src/pages/Calendar.tsx` (L86-108). Testar a 338px: grid alinhado, nada vazando, tocar dia abre o detalhe.
+
+### ✅ P-F · Card "Total Apostado" (e outros valores longos) vaza no mobile — RESOLVIDO 2026-07-09
+**RESOLVIDO:** `.stat-value` responsivo (`text-xl md:text-2xl`), `min-w-0`/`overflow-hidden` no StatCard. Ver sessão 2026-07-09 (2).
+Registro histórico:
+**Sintoma (screenshot 338px):** o valor "R$ 13.208,83" ultrapassa a borda direita do card "Total Apostado" no grid de KPIs 2 colunas.
+
+**Causa:** `.stat-value` é `@apply font-mono text-2xl font-semibold` (24px) em `src/index.css` L156-158. No grid `grid-cols-2` a ~338px, cada card tem ~155px, menos `p-4` (16px×2) ≈ **123px úteis**. "R$ 13.208,83" a 24px mono ≈ 160-170px — não cabe. É o valor mais longo do painel (Total Apostado é o campo com mais dígitos); os KPIs primários `size="lg"` já reduzem para `text-2xl md:text-3xl`, mas os secundários usam a base `text-2xl` fixa. O `hover:scale-[1.02]` do Link agrava marginalmente.
+
+**Correção (recomendo 1+2):**
+1. **Fonte responsiva no `.stat-value`:** reduzir a base no mobile — ex.: `@apply font-mono text-xl md:text-2xl font-semibold tracking-tight` (20px no mobile, 24px ≥ md). Reavaliar se ainda estoura com o valor mais longo realista.
+2. **Garantir encolhimento:** no `StatCard.tsx` (L65-74), o container do valor precisa de `min-w-0` e `tabular-nums`; considerar `break-words` ou reduzir `p-4`→`p-3` no mobile para ganhar largura. NÃO usar `truncate` (cortaria dígitos do número).
+3. Testar com o maior valor possível (ex.: banca de 6 dígitos "R$ 100.000,00") a 338px em todos os cards do Dashboard, não só o Total Apostado.
+
+**Arquivos-alvo:** `src/index.css` (L156-158, `.stat-value`), `src/components/StatCard.tsx` (L65-74).
+
+### ✅ P-G · Varredura de overflow mobile nas telas ainda não testadas — RESOLVIDO 2026-07-09
+**RESOLVIDO:** todas as telas conferidas — Bets, Bankroll, NewBet/BetForm, Analytics — sem overflow adicional além do StatCard (coberto pelo P-F). Ver sessão 2026-07-09 (2).
+Registro histórico:
+**Motivo:** P-A→P-F mostraram que o vazamento no mobile se repete onde há **valores monetários longos** (`.stat-value`, `font-mono`, texto sem `min-w-0`/`overflow`). Só Dashboard e Calendário foram olhados a fundo em aparelho. Fazer uma varredura das demais a 338px:
+- **Apostas** (`src/pages/Bets.tsx`) — cards de aposta, KPIs do header, selects de filtro/paginação.
+- **Banca** (`src/pages/Bankroll.tsx`) — grid de KPIs, waterfall "Composição da banca", tabela de transações.
+- **Nova aposta** (`src/pages/NewBet.tsx` / `BetForm.tsx`) — painel calculado (grid de 5), inputs com prefixo de moeda.
+- **Análises** (`src/pages/Analytics.tsx`) — KPIs e eixos dos gráficos.
+
+**Padrão de correção (reaproveitar de P-E/P-F):** onde houver valor monetário/mono em card ou célula estreita → garantir `min-w-0` no container flex/grid + `overflow-hidden` + fonte responsiva quando `text-2xl`+; nunca `truncate` em número; testar com o maior valor realista (6 dígitos). Registrar no HANDOFF cada tela conferida (mesmo as que estiverem OK).
+**Arquivos-alvo:** `src/pages/Bets.tsx`, `Bankroll.tsx`, `NewBet.tsx`, `Analytics.tsx`, `src/components/bets/BetForm.tsx`, `BetCard.tsx`.
 
 ### ✅ P-A · "Vazamento" no Dashboard mobile = TOOLTIP DO RECHARTS PRESO — RESOLVIDO 2026-07-09
 **RESOLVIDO:** scroll/touchmove listeners + timeout 4s em Dashboard.tsx e Analytics.tsx. Ver sessão 2026-07-09.

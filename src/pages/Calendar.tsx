@@ -88,7 +88,7 @@ export default function CalendarPage() {
                 key={i}
                 onClick={() => count > 0 && setOpenDay(key)}
                 className={cn(
-                  "aspect-square rounded-lg p-2 border text-left flex flex-col justify-between transition",
+                  "aspect-square rounded-lg p-2 border text-left flex flex-col justify-between transition overflow-hidden min-w-0",
                   count === 0 && "border-border/60 bg-muted/30 text-muted-foreground",
                   count > 0 && profit > 0 && "border-success/40 bg-success/10 hover:bg-success/15",
                   count > 0 && profit < 0 && "border-destructive/40 bg-destructive/10 hover:bg-destructive/15",
@@ -97,8 +97,8 @@ export default function CalendarPage() {
               >
                 <div className="text-xs font-medium">{d}</div>
                 {count > 0 && (
-                  <div className="text-right">
-                    <div className={cn("text-xs font-mono", profit > 0 ? "positive" : profit < 0 ? "negative" : "neutral")}>
+                  <div className="text-right overflow-hidden">
+                    <div className={cn("hidden sm:block text-xs font-mono", profit > 0 ? "positive" : profit < 0 ? "negative" : "neutral")}>
                       {formatCurrency(profit, currency)}
                     </div>
                     <div className="text-[10px] text-muted-foreground">{count} aposta{count > 1 ? "s" : ""}</div>

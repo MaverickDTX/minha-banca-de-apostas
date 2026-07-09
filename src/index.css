@@ -154,7 +154,7 @@
 
 @layer components {
   .stat-value {
-    @apply font-mono text-2xl font-semibold tracking-tight;
+    @apply font-mono text-xl md:text-2xl font-semibold tracking-tight;
   }
   .stat-label {
     @apply text-xs uppercase tracking-wider text-muted-foreground font-medium;
