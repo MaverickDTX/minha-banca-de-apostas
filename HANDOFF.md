@@ -2,6 +2,49 @@
 
 Data: 2026-07-09 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-09 (3) — Pendência 1 (calendário/horário) + Pendência 2 (unidade "u" como moeda)
+
+### ⚠️ NOTA DE AMBIENTE (ler antes de editar) — truncamento por FUSE
+Edições via ferramenta de arquivo (Edit/Write) através da montagem host↔sandbox
+truncaram silenciosamente o FIM dos arquivos nesta sessão: `tsc` (lê versão
+íntegra) passava, mas SWC/vitest (lê disco truncado) falhavam com
+"Unterminated block comment/string". **Caminho seguro: gravar via shell**
+(`cat > arquivo << 'EOF'` ou Python) e SEMPRE conferir depois com
+`wc -l` + parse SWC. Também aparecem arquivos `.fuse_hidden*` e `.git/index.lock`
+presos ("Operation not permitted") — limpar/commitar pelo Windows.
+
+### P-1 — Listar apostas no calendário + horário no card
+- `src/lib/format.ts`: novo `formatTime(value)` → hora local "HH:mm".
+- `src/components/bets/BetCard.tsx`: `dateLabel` = data + horário do evento
+  (`event_date`) quando existir (ex.: "11/07 · 20:30"); aplicado nos layouts
+  compact e full.
+- `src/pages/Calendar.tsx`: Dialog do dia vira mini feed — cada aposta com
+  horário, evento, mercado·seleção, @odd, stake, status e lucro; ordenado por
+  horário; header com contagem + resultado do dia.
+
+### P-2 — Unidade "u" como moeda selecionável (todo o app)
+Escopo: "u" é opção de moeda ao lado de BRL/USD/EUR. Quando selecionada, todo o
+app exibe "X.XX u" = valor / unit_value. Conversão só na apresentação — banco
+continua em R$.
+- `src/lib/format.ts`: `formatCurrency(v, currency, unitValue?)` ganha branch "u";
+  `formatWithUnits` faz short-circuit quando currency="u" (não duplica).
+- `src/pages/Settings.tsx`: opção "Unidades (u)" + `currencySymbol` case "u";
+  campo "Valor da unidade" **fixo em R$** (é a entrada que alimenta a conversão —
+  escondê-lo quebraria a feature).
+- `src/lib/insights.ts`: `InsightContext.unitValue` + 4 mensagens.
+- Threading de `profile?.unit_value` em Dashboard (+ computeInsights), Analytics
+  (nova prop em `GroupTable` + 11 usos), Bankroll, Calendar, Bets, BetForm, BetCard.
+- **Mantidos em R$ fixo** (entrada/definição de dinheiro real): card "Unidade
+  atual" (Bankroll) e input "Stake" (BetForm, que tem campo "Unidades" ao lado);
+  placeholder "1u = R$ X" oculto quando currency=u.
+- Novo `src/lib/format.test.ts` (10 testes cobrindo o branch "u").
+
+### Verificação
+- `tsc --noEmit` OK; `vitest run` **119/119** OK (109 + 10 novos).
+
+### Estado de commit
+- **P-1 + P-2 commitados e enviados (git push feito)** nesta sessão.
+
 ## ✅ Sessão 2026-07-09 (2) — P-E calendário mobile + P-F stat-value responsivo + P-G varredura overflow
 
 ### P-E — Calendário quebrado no mobile
