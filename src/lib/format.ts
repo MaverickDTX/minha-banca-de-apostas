@@ -49,13 +49,20 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d);
 }
 
+/** Apenas a hora local (HH:mm). Retorna "" se não houver valor. */
+export function formatTime(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(d);
+}
+
 export function toISODateInput(value: string | Date | null | undefined): string {
   if (!value) return "";
   const d = typeof value === "string" ? new Date(value) : value;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-
 /** Chave de dia (YYYY-MM-DD) no fuso LOCAL — evita deslocamento por UTC. */
 export function toLocalDateKey(value: string | Date | null | undefined): string {
   if (!value) return "";

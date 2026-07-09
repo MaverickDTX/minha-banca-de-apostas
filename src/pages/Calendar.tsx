@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useBets } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
 import { isSettled, STATUS_COLORS, STATUS_LABELS } from "@/lib/calc";
-import { formatCurrency, formatDateTime, toLocalDateKey } from "@/lib/format";
+import { formatCurrency, formatNumber, formatTime, toLocalDateKey } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -52,8 +52,15 @@ export default function CalendarPage() {
   const monthProfit = monthBets.filter((b) => isSettled(b.status)).reduce((s, b) => s + Number(b.net_profit || 0), 0);
 
   const dayBets = openDay
-    ? bets.filter((b) => toLocalDateKey(b.bet_date) === openDay)
+    ? bets
+        .filter((b) => toLocalDateKey(b.bet_date) === openDay)
+        .sort((a, b) => {
+          const ta = a.event_date ? new Date(a.event_date).getTime() : Number.MAX_SAFE_INTEGER;
+          const tb = b.event_date ? new Date(b.event_date).getTime() : Number.MAX_SAFE_INTEGER;
+          return ta - tb;
+        })
     : [];
+  const dayProfit = dayBets.filter((b) => isSettled(b.status)).reduce((s, b) => s + Number(b.net_profit || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -116,21 +123,42 @@ export default function CalendarPage() {
       <Dialog open={!!openDay} onOpenChange={(o) => !o && setOpenDay(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Apostas em {openDay && new Date(`${openDay}T00:00:00`).toLocaleDateString("pt-BR")}</DialogTitle>
+            <DialogTitle className="flex items-baseline justify-between gap-3 pr-6">
+              <span>Apostas em {openDay && new Date(`${openDay}T00:00:00`).toLocaleDateString("pt-BR")}</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {dayBets.length} aposta{dayBets.length !== 1 ? "s" : ""} ·{" "}
+                <span className={cn("font-mono font-semibold", dayProfit > 0 ? "positive" : dayProfit < 0 ? "negative" : "")}>
+                  {formatCurrency(dayProfit, currency)}
+                </span>
+              </span>
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-            {dayBets.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg">
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{b.event_name || "—"}</div>
-                  <div className="text-xs text-muted-foreground truncate">{b.market} · {b.selection} · {formatDateTime(b.bet_date)}</div>
+            {dayBets.map((b) => {
+              const net = b.status !== "pendente" && b.net_profit != null ? Number(b.net_profit) : null;
+              const time = formatTime(b.event_date);
+              return (
+                <div key={b.id} className="flex items-center gap-3 p-3 border border-border rounded-lg">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {time && <span className="font-mono text-xs text-muted-foreground shrink-0">{time}</span>}
+                      <span className="font-medium truncate">{b.event_name || "—"}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[b.market, b.selection].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 font-mono tabular-nums text-xs text-muted-foreground">
+                    <span title="Odd">@{formatNumber(Number(b.odds), 2)}</span>
+                    <span title="Stake">{formatCurrency(Number(b.stake_amount), currency)}</span>
+                  </div>
+                  <Badge variant="outline" className={cn("shrink-0", STATUS_COLORS[b.status])}>{STATUS_LABELS[b.status]}</Badge>
+                  <div className={cn("font-mono text-sm tabular-nums min-w-[84px] text-right shrink-0", net != null && net > 0 ? "positive" : net != null && net < 0 ? "negative" : "")}>
+                    {net != null ? formatCurrency(net, currency) : "—"}
+                  </div>
                 </div>
-                <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>
-                <div className={cn("font-mono text-sm", Number(b.net_profit) > 0 ? "positive" : Number(b.net_profit) < 0 ? "negative" : "")}>
-                  {b.net_profit != null ? formatCurrency(Number(b.net_profit), currency) : "—"}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>

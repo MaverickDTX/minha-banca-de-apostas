@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { BookmakerLogo } from "@/components/bookmakers/BookmakerLogo";
 import { STATUS_COLORS, STATUS_LABELS, type BetStatus, type LegStatus } from "@/lib/calc";
-import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/format";
+import { formatCurrency, formatDate, formatNumber, formatPercent, formatTime } from "@/lib/format";
 import { useBetLegs, type Bet } from "@/hooks/useBets";
 import { StatusBadgePop } from "@/components/bets/StatusBadgePop";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,9 @@ export function BetCard({
   // Pendente não tem resultado — exibir "—" em vez de R$ 0,00 (zero = break-even).
   const net = bet.status !== "pendente" && bet.net_profit != null ? Number(bet.net_profit) : null;
   const isMultiple = bet.bet_type === "multipla";
+  // Data da aposta + horário do evento quando disponível (ex.: "11/07 · 20:30").
+  const eventTime = formatTime(bet.event_date);
+  const dateLabel = eventTime ? `${formatDate(bet.bet_date)} · ${eventTime}` : formatDate(bet.bet_date);
   const [expanded, setExpanded] = useState(false);
   const { data: legs = [] } = useBetLegs(isMultiple ? bet.id : undefined);
 
@@ -190,7 +193,7 @@ export function BetCard({
             {bet.bookmaker || "—"}
             {bet.market ? ` | ${bet.market}` : ""}
             {bet.selection ? ` — ${bet.selection}` : ""}
-            {" | "}{formatDate(bet.bet_date)}
+            {" | "}{dateLabel}
           </div>
         </div>
         <div className="hidden sm:flex items-center gap-4 shrink-0 font-mono tabular-nums text-[13px]">
@@ -303,7 +306,7 @@ export function BetCard({
                   bet.league,
                   TYPE_LABEL[bet.bet_type] ?? bet.bet_type,
                   TIMING_LABEL[bet.timing] ?? bet.timing,
-                  formatDate(bet.bet_date),
+                  dateLabel,
                 ]
                   .filter((p): p is string => Boolean(p))
                   .flatMap((part, i) => [
