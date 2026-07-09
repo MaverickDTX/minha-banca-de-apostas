@@ -680,3 +680,16 @@ Feedback na 1ª passada: verde "militar" (saturação alta), JetBrains Mono não
 - Páginas: `src/pages/Bets.tsx`, `NewBet.tsx`, `Settings.tsx`, `Dashboard.tsx`, `Analytics.tsx`, `Bankroll.tsx`.
 - Dados: `src/hooks/useProfile.ts`, `useBets.ts`, `src/integrations/supabase/types.ts`.
 - Tradução: `src/lib/translate.ts`.
+
+## 🔧 PENDÊNCIAS NOVAS (2026-07-09)
+
+### 1. Listar apostas no card "apostas por dia" + horário do evento no card
+- **Card "Apostas por dia"** (Calendar.tsx): ao tocar um dia, o Dialog exibe as apostas daquele dia. Hoje mostra data + valor. **Queremos listar cada aposta** (evento, odd, stake, resultado) dentro do Dialog, como um mini feed.
+- **Horário do evento no BetCard**: adicionar o horário (`event_date`) ao lado da data nos cards de aposta (BetCard.tsx e/ou Bets.tsx). Ex.: "11/07 · 20:30" em vez de só "11/07".
+- **Arquivos-alvo**: `src/pages/Calendar.tsx` (Dialog com listagem), `src/components/bets/BetCard.tsx` (horário no metadata), `src/pages/Bets.tsx` (tabela se aplicável).
+
+### 2. Unidade como moeda nativa (R$/u intercambiáveis)
+- Hoje `formatWithUnits` exibe "R$ X (Y u)" nos tooltips. **Queremos que unidade seja tratada como mais uma opção de moeda** — selecionável em Configurações (ao lado de BRL/USD/EUR), fazendo TODO o app exibir valores em unidades (stat cards, gráficos, tabelas, formulários) em vez de reais.
+- Ou seja: se o usuário selecionar "Unidade (u)" como moeda, `formatCurrency(v, "u")` retorna `"X.XX u"` (calculado como `v / unit_value`). Os valores em R$ continuam armazenados no banco — a conversão é só na camada de apresentação.
+- **Implicações**: (a) migration/conversão não é necessária; (b) `formatCurrency` precisa de um terceiro parâmetro opcional `unitValue` ou criar `formatCurrencyWithUnit`; (c) Settings.tsx ganha opção extra no seletor de moeda; (d) todos os callers de `formatCurrency` que envolvem valores de aposta/banca precisam passar o unit_value quando a moeda for "u".
+- **Arquivos-alvo**: `src/lib/format.ts`, `src/pages/Settings.tsx`, `src/hooks/useProfile.ts` (type do currency aceitar "u"), e todos os arquivos que chamam `formatCurrency` com valores monetários.
