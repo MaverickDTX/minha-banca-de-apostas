@@ -74,13 +74,32 @@ function extractJsonFromText(text: string): string | null {
   return match ? match[0] : null;
 }
 
+type ProviderResult =
+  | { ok: true; raw: string }
+  | { ok: false; reason: "http" | "network" | "empty"; httpStatus?: number };
+
+function logProviderAttempt(
+  provider: string,
+  outcome: "ok" | "http_error" | "network_error" | "empty" | "validation_failed",
+  httpStatus: number | null,
+): void {
+  console.log(
+    JSON.stringify({
+      tag: "provider_attempt",
+      provider,
+      http_status: httpStatus,
+      outcome,
+    }),
+  );
+}
+
 async function callGemini(
   model: string,
   prompt: string,
   base64Image: string | undefined,
   apiKey: string,
   useSchema: boolean,
-): Promise<string | null> {
+): Promise<ProviderResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [{ text: prompt }];
@@ -109,17 +128,29 @@ async function callGemini(
     if (!res.ok) {
       const errText = await res.text();
       console.error(`Gemini ${model} error ${res.status}:`, errText);
-      return null;
+      logProviderAttempt(model, "http_error", res.status);
+      return { ok: false, reason: "http", httpStatus: res.status };
     }
 
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
+    if (!text) {
+      logProviderAttempt(model, "empty", res.status);
+      return { ok: false, reason: "empty", httpStatus: res.status };
+    }
 
-    return useSchema ? text : extractJsonFromText(text);
+    const raw = useSchema ? text : extractJsonFromText(text);
+    if (!raw) {
+      logProviderAttempt(model, "empty", res.status);
+      return { ok: false, reason: "empty", httpStatus: res.status };
+    }
+
+    logProviderAttempt(model, "ok", res.status);
+    return { ok: true, raw };
   } catch (err) {
     console.error(`Gemini ${model} exception:`, err);
-    return null;
+    logProviderAttempt(model, "network_error", null);
+    return { ok: false, reason: "network" };
   }
 }
 
@@ -127,8 +158,9 @@ async function callZen(
   prompt: string,
   base64Image: string | undefined,
   apiKey: string,
-): Promise<string | null> {
+): Promise<ProviderResult> {
   const url = "https://opencode.ai/zen/v1/chat/completions";
+  const provider = "mimo-v2.5-free";
 
   const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [{ type: "text", text: prompt }];
   if (base64Image) {
@@ -143,7 +175,7 @@ async function callZen(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "mimo-v2.5-free",
+        model: provider,
         messages: [{ role: "user", content }],
         temperature: 0.1,
       }),
@@ -152,17 +184,29 @@ async function callZen(
     if (!res.ok) {
       const errText = await res.text();
       console.error("Zen API error", res.status, errText);
-      return null;
+      logProviderAttempt(provider, "http_error", res.status);
+      return { ok: false, reason: "http", httpStatus: res.status };
     }
 
     const data = await res.json();
     const text = data?.choices?.[0]?.message?.content;
-    if (!text) return null;
+    if (!text) {
+      logProviderAttempt(provider, "empty", res.status);
+      return { ok: false, reason: "empty", httpStatus: res.status };
+    }
 
-    return extractJsonFromText(text);
+    const raw = extractJsonFromText(text);
+    if (!raw) {
+      logProviderAttempt(provider, "empty", res.status);
+      return { ok: false, reason: "empty", httpStatus: res.status };
+    }
+
+    logProviderAttempt(provider, "ok", res.status);
+    return { ok: true, raw };
   } catch (err) {
     console.error("Zen exception:", err);
-    return null;
+    logProviderAttempt(provider, "network_error", null);
+    return { ok: false, reason: "network" };
   }
 }
 
@@ -201,29 +245,28 @@ interface ExtractParams {
   correctionText?: string;
 }
 
-export async function extractBetData(params: ExtractParams): Promise<BetInput | null> {
+export type ExtractOutcome =
+  | { status: "ok"; bet: BetInput }
+  | { status: "unreadable" }
+  | { status: "unavailable" };
+
+export async function extractBetData(params: ExtractParams): Promise<ExtractOutcome> {
   const prompt = buildPrompt(params.userText, params.caption, params.currentPayload, params.correctionText);
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
   const zenApiKey = Deno.env.get("ZEN_API_KEY");
 
-  // Provider chain
-  const providers: Array<{
-    name: string;
-    run: () => Promise<string | null>;
-  }> = [];
+  // Cadeia de provedores (ordem preservada)
+  const providers: Array<{ name: string; run: () => Promise<ProviderResult> }> = [];
 
   if (geminiApiKey) {
-    // 1 — Gemini 3.1 flash lite (com schema)
     providers.push({
       name: "gemini-3.1-flash-lite",
       run: () => callGemini("gemini-3.1-flash-lite", prompt, params.base64Image, geminiApiKey, true),
     });
-    // 2 — Gemini 3.5 flash (com schema)
     providers.push({
       name: "gemini-3.5-flash",
       run: () => callGemini("gemini-3.5-flash", prompt, params.base64Image, geminiApiKey, true),
     });
-    // 3 — Gemma 4 (sem schema)
     providers.push({
       name: "gemma-4-26b-a4b-it",
       run: () => callGemini("gemma-4-26b-a4b-it", prompt, params.base64Image, geminiApiKey, false),
@@ -237,21 +280,38 @@ export async function extractBetData(params: ExtractParams): Promise<BetInput | 
     });
   }
 
+  // sawContent: algum provedor respondeu, mas o conteúdo não validou (imagem/descrição ilegível).
+  // sawInfraFailure: houve falha de rede/HTTP em algum provedor.
+  let sawContent = false;
+  let sawInfraFailure = false;
+
   for (const provider of providers) {
-    console.log(`Trying provider: ${provider.name}`);
-    const raw = await provider.run();
-    if (!raw) {
-      console.log(`Provider ${provider.name} returned null, trying next`);
+    const result = await provider.run();
+
+    if (result.ok) {
+      const bet = validateAndNormalize(result.raw);
+      if (bet) {
+        return { status: "ok", bet };
+      }
+      // provedor respondeu, mas o JSON não passou na validação → conteúdo insuficiente
+      logProviderAttempt(provider.name, "validation_failed", null);
+      sawContent = true;
       continue;
     }
 
-    const bet = validateAndNormalize(raw);
-    if (bet) {
-      console.log(`Provider ${provider.name} succeeded`);
-      return bet;
+    if (result.reason === "http" || result.reason === "network") {
+      sawInfraFailure = true;
+    } else {
+      // "empty": provedor respondeu 200 sem conteúdo aproveitável → tratar como ilegível
+      sawContent = true;
     }
-    console.log(`Provider ${provider.name} failed validation, trying next`);
   }
 
-  return null;
+  // Nenhum provedor produziu uma aposta válida.
+  // Se algum chegou a responder com conteúdo (mas nada validou) → ilegível.
+  // Caso contrário (só falhas de rede/HTTP, ou nenhum provedor configurado) → indisponível.
+  if (sawContent) {
+    return { status: "unreadable" };
+  }
+  return { status: "unavailable" };
 }

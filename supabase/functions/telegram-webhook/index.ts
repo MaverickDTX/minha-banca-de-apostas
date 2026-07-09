@@ -10,6 +10,8 @@ import {
 } from "./telegram.ts";
 import { extractBetData } from "./providers.ts";
 
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -197,24 +199,38 @@ async function handleTextMessage(chatId: number, text: string): Promise<void> {
     const pendingId = correctionPending.id as string;
     const currentPayload = JSON.stringify(correctionPending.payload);
 
-    const bet = await extractBetData({
+    const outcome = await extractBetData({
       currentPayload,
       correctionText: text,
     });
 
-    if (bet) {
-      await updateRow("telegram_pending_bets", pendingId, {
-        payload: bet as unknown as Record<string, unknown>,
-        awaiting_correction: false,
-      });
-      const summary = formatBetSummary(bet);
-      await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pendingId), "Markdown");
-    } else {
-      await sendMessage(
-        BOT_TOKEN,
-        chatId,
-        "Não entendi as correções. Envie no formato: `casa: Betano, stake: 25`",
-      );
+    switch (outcome.status) {
+      case "ok": {
+        const bet = outcome.bet;
+        await updateRow("telegram_pending_bets", pendingId, {
+          payload: bet as unknown as Record<string, unknown>,
+          awaiting_correction: false,
+        });
+        const summary = formatBetSummary(bet);
+        await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pendingId), "Markdown");
+        break;
+      }
+      case "unreadable": {
+        await sendMessage(
+          BOT_TOKEN,
+          chatId,
+          "Não entendi as correções. Envie no formato: `casa: Betano, stake: 25`",
+        );
+        break;
+      }
+      case "unavailable": {
+        await sendMessage(
+          BOT_TOKEN,
+          chatId,
+          "O serviço de leitura está temporariamente indisponível. Tente reenviar em alguns instantes.",
+        );
+        break;
+      }
     }
     return;
   }
@@ -226,22 +242,36 @@ async function handleTextMessage(chatId: number, text: string): Promise<void> {
     return;
   }
 
-  const bet = await extractBetData({ userText: text });
-  if (bet) {
-    const pending = await insertRow("telegram_pending_bets", {
-      chat_id: chatId,
-      payload: bet as unknown as Record<string, unknown>,
-    });
-    if (pending) {
-      const summary = formatBetSummary(bet);
-      await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pending.id as string), "Markdown");
+  const outcome = await extractBetData({ userText: text });
+  switch (outcome.status) {
+    case "ok": {
+      const bet = outcome.bet;
+      const pending = await insertRow("telegram_pending_bets", {
+        chat_id: chatId,
+        payload: bet as unknown as Record<string, unknown>,
+      });
+      if (pending) {
+        const summary = formatBetSummary(bet);
+        await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pending.id as string), "Markdown");
+      }
+      break;
     }
-  } else {
-    await sendMessage(
-      BOT_TOKEN,
-      chatId,
-      "Não foi possível interpretar sua descrição. Tente incluir: evento, odd, stake, casa de apostas.",
-    );
+    case "unreadable": {
+      await sendMessage(
+        BOT_TOKEN,
+        chatId,
+        "Não foi possível interpretar sua descrição. Tente incluir: evento, odd, stake, casa de apostas.",
+      );
+      break;
+    }
+    case "unavailable": {
+      await sendMessage(
+        BOT_TOKEN,
+        chatId,
+        "O serviço de leitura está temporariamente indisponível. Tente reenviar em alguns instantes.",
+      );
+      break;
+    }
   }
 }
 
@@ -281,22 +311,36 @@ async function handlePhotoMessage(
     return;
   }
 
-  const bet = await extractBetData({ base64Image: base64, caption });
-  if (bet) {
-    const pending = await insertRow("telegram_pending_bets", {
-      chat_id: chatId,
-      payload: bet as unknown as Record<string, unknown>,
-    });
-    if (pending) {
-      const summary = formatBetSummary(bet);
-      await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pending.id as string), "Markdown");
+  const outcome = await extractBetData({ base64Image: base64, caption });
+  switch (outcome.status) {
+    case "ok": {
+      const bet = outcome.bet;
+      const pending = await insertRow("telegram_pending_bets", {
+        chat_id: chatId,
+        payload: bet as unknown as Record<string, unknown>,
+      });
+      if (pending) {
+        const summary = formatBetSummary(bet);
+        await sendMessage(BOT_TOKEN, chatId, summary, confirmationKeyboard(pending.id as string), "Markdown");
+      }
+      break;
     }
-  } else {
-    await sendMessage(
-      BOT_TOKEN,
-      chatId,
-      "Não foi possível extrair os dados da imagem. Tente enviar uma foto mais nítida ou descrever a aposta em texto.",
-    );
+    case "unreadable": {
+      await sendMessage(
+        BOT_TOKEN,
+        chatId,
+        "Não foi possível extrair os dados da imagem. Tente enviar uma foto mais nítida ou descrever a aposta em texto.",
+      );
+      break;
+    }
+    case "unavailable": {
+      await sendMessage(
+        BOT_TOKEN,
+        chatId,
+        "O serviço de leitura está temporariamente indisponível. Tente reenviar em alguns instantes.",
+      );
+      break;
+    }
   }
 }
 
@@ -357,21 +401,11 @@ async function handleCallbackQuery(
   }
 }
 
-// ── Main ──────────────────────────────────────────────────────
+// ── Update processing (background) ────────────────────────────
 
-serve(async (req) => {
+async function processUpdate(update: any): Promise<void> {
   try {
-    // 1. Verify secret token
-    const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
-    if (secret !== WEBHOOK_SECRET) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    // 2. Parse update
-    const update = await req.json();
-    console.log("Update:", JSON.stringify(update).slice(0, 500));
-
-    // 3. Handle callback query
+    // Handle callback query
     const cq = update.callback_query;
     if (cq) {
       await handleCallbackQuery(
@@ -380,12 +414,12 @@ serve(async (req) => {
         cq.message.chat.id,
         cq.message.message_id,
       );
-      return new Response("OK", { status: 200 });
+      return;
     }
 
-    // 4. Handle message
+    // Handle message
     const msg = update.message;
-    if (!msg) return new Response("OK", { status: 200 });
+    if (!msg) return;
 
     const chatId = msg.chat.id;
     const text = msg.text?.trim();
@@ -396,20 +430,20 @@ serve(async (req) => {
     if (text) {
       if (text === "/start") {
         await handleStart(chatId);
-        return new Response("OK", { status: 200 });
+        return;
       }
 
       const vincularMatch = text.match(/^\/vincular\s+(.+)$/i);
       if (vincularMatch) {
         await handleVincular(chatId, vincularMatch[1].trim());
-        return new Response("OK", { status: 200 });
+        return;
       }
 
       if (text === "/pausar" || text === "/retomar") {
         const user = await resolveUser(chatId);
         if (!user) {
           await sendMessage(BOT_TOKEN, chatId, "Você precisa vincular sua conta primeiro. Envie /start para instruções.");
-          return new Response("OK", { status: 200 });
+          return;
         }
         const paused = text === "/pausar";
         await setExtractionPaused(paused);
@@ -420,7 +454,7 @@ serve(async (req) => {
             ? "Processamento de apostas pausado ⏸️ Fotos e textos serão ignorados até você enviar /retomar."
             : "Processamento reativado ▶️",
         );
-        return new Response("OK", { status: 200 });
+        return;
       }
     }
 
@@ -428,25 +462,49 @@ serve(async (req) => {
     if ((photos && photos.length > 0) || text) {
       if (await isExtractionPaused()) {
         await sendMessage(BOT_TOKEN, chatId, "Processamento pausado ⏸️ Envie /retomar para reativar.");
-        return new Response("OK", { status: 200 });
+        return;
       }
     }
 
     // Photo
     if (photos && photos.length > 0) {
       await handlePhotoMessage(chatId, photos, caption);
-      return new Response("OK", { status: 200 });
+      return;
     }
 
     // Plain text (not a command, not a photo)
     if (text) {
       await handleTextMessage(chatId, text);
+      return;
+    }
+  } catch (err) {
+    console.error("processUpdate error:", err);
+  }
+}
+
+// ── HTTP handler (ACK imediato) ───────────────────────────────
+
+serve((req) => {
+  // 1. Verify secret token
+  const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
+  if (secret !== WEBHOOK_SECRET) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  // 2. Parse do body e ACK imediato; o processamento roda em background.
+  //    O parse precisa ocorrer aqui (o corpo do request não sobrevive ao
+  //    término do handler); só processUpdate roda via EdgeRuntime.waitUntil.
+  return (async () => {
+    let update: unknown;
+    try {
+      update = await req.json();
+    } catch {
+      // Corpo inválido: ainda respondemos 200 para o Telegram não reenviar.
       return new Response("OK", { status: 200 });
     }
 
+    console.log("Update:", JSON.stringify(update).slice(0, 500));
+    EdgeRuntime.waitUntil(processUpdate(update as any));
     return new Response("OK", { status: 200 });
-  } catch (err) {
-    console.error("Unhandled error:", err);
-    return new Response("OK", { status: 200 });
-  }
+  })();
 });
