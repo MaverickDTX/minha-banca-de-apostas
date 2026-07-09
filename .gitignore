@@ -44,3 +44,5 @@ HANDOFF.md
 
 # Temporários do Supabase CLI
 supabase/.temp/
+
+deno.lock
