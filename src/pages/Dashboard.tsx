@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion, type Variants } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useBets } from "@/hooks/useBets";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useProfile } from "@/hooks/useProfile";
@@ -8,10 +8,10 @@ import { StatCard } from "@/components/StatCard";
 import { computeBankroll, computeMetrics, groupBy } from "@/lib/metrics";
 import { computeInsights, type InsightSeverity } from "@/lib/insights";
 import { buildAnalyticsUrl, currentMonthRange, getBetGroupKey } from "@/lib/analyticsUrl";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import { formatCurrency, formatNumber, formatPercent, formatWithUnits } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Wallet, TrendingUp, TrendingDown, Activity, Target, Flame, PlusCircle, ArrowUpRight, Banknote, ListChecks, Percent, Dices, Coins, CalendarDays, AlertTriangle, Info, Lightbulb } from "lucide-react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isSettled, STATUS_LABELS } from "@/lib/calc";
 import { cn } from "@/lib/utils";
@@ -28,14 +28,16 @@ const fadeUp: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: DUR.reveal, ease: EASE.out } },
 };
 
-const CHART_RANGES = [
+const PRESETS = [
+  { days: 7, label: "7d" },
+  { days: 14, label: "14d" },
   { days: 30, label: "30d" },
   { days: 90, label: "90d" },
   { days: null, label: "Tudo" },
 ] as const;
 
 export default function Dashboard() {
-  const [chartDays, setChartDays] = useState<number | null>(90);
+  const [chartDays, setChartDays] = useState<number | null>(30);
   useEffect(() => { document.title = "Dashboard · Bankroll Pro"; }, []);
   useEffect(() => {
     let touchedChart: Element | null = null;
@@ -80,6 +82,7 @@ export default function Dashboard() {
   const { data: txs = [] } = useTransactions();
   const { data: profile } = useProfile();
   const currency = profile?.currency ?? "BRL";
+  const reduce = useReducedMotion();
   const monthRange = useMemo(() => currentMonthRange(), []);
   const chartCutoff = useMemo(() => {
     if (chartDays == null) return null;
@@ -95,23 +98,32 @@ export default function Dashboard() {
   const initialBankroll = Number(profile?.initial_bankroll ?? 0);
   const roi = initialBankroll > 0 ? (bank.betsProfit / initialBankroll) * 100 : 0;
 
-  const evolution = useMemo(() => {
+  const cumChart = useMemo(() => {
     const settled = bets
       .filter((b) => isSettled(b.status))
       .slice()
       .sort((a, b) => new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime());
-    let cum = Number(profile?.initial_bankroll ?? 0);
-    const byDay = new Map<number, number>();
+    // Resultado por dia (diario). O acumulado (total) e RELATIVO ao periodo:
+    // filtra pelo cutoff ANTES de acumular, entao a linha zera no inicio do recorte.
+    const cutoff = chartCutoff?.getTime() ?? -Infinity;
+    const diarioPorDia = new Map<number, number>();
     for (const b of settled) {
-      cum += Number(b.net_profit || 0);
       const d = new Date(b.bet_date);
       d.setHours(0, 0, 0, 0);
-      byDay.set(d.getTime(), cum);
+      const t = d.getTime();
+      if (t < cutoff) continue;
+      diarioPorDia.set(t, (diarioPorDia.get(t) ?? 0) + Number(b.net_profit || 0));
     }
-    const cutoff = chartCutoff?.getTime() ?? -Infinity;
-    const points = Array.from(byDay, ([t, banca]) => ({ t, banca })).filter((p) => p.t >= cutoff);
+    let cum = 0;
+    const byDay = new Map<number, { diario: number; total: number }>();
+    for (const t of Array.from(diarioPorDia.keys()).sort((a, b) => a - b)) {
+      const diario = diarioPorDia.get(t) ?? 0;
+      cum += diario;
+      byDay.set(t, { diario, total: cum });
+    }
+    const points = Array.from(byDay, ([t, v]) => ({ t, ...v }));
     if (points.length === 0) {
-      points.push({ t: Date.now(), banca: cum });
+      points.push({ t: Date.now(), diario: 0, total: 0 });
     }
     return points;
   }, [bets, profile, chartCutoff]);
@@ -261,7 +273,7 @@ export default function Dashboard() {
       )}
 
       <div className="flex items-center gap-1">
-        {CHART_RANGES.map((r) => (
+        {PRESETS.map((r) => (
           <Button
             key={r.label}
             type="button"
@@ -277,15 +289,9 @@ export default function Dashboard() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 min-w-0 overflow-x-hidden">
-        <ChartCard title="Evolução da banca" className="lg:col-span-2 min-w-0">
+        <ChartCard title="Resultado diário & acumulado" className="lg:col-span-2 min-w-0">
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={evolution}>
-              <defs>
-                <linearGradient id="bk" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <LineChart data={cumChart}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis
                 dataKey="t"
@@ -299,11 +305,12 @@ export default function Dashboard() {
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <Tooltip
                 contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                formatter={(v: number) => formatCurrency(v, currency)}
+                formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)}
                 labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
               />
-              <Area type="monotone" dataKey="banca" name="Banca" stroke="hsl(var(--primary))" fill="url(#bk)" strokeWidth={2} />
-            </AreaChart>
+              <Line type="monotone" dataKey="total" name="Acumulado" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} isAnimationActive={!reduce} />
+              <Line type="monotone" dataKey="diario" name="Diário" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={!reduce} />
+            </LineChart>
           </ResponsiveContainer>
         </ChartCard>
 
@@ -345,7 +352,7 @@ export default function Dashboard() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)} />
               <Bar
                 dataKey="profit"
                 name="Lucro"
@@ -373,7 +380,7 @@ export default function Dashboard() {
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={95} />
-              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)} />
               <Bar
                 dataKey="lucro"
                 name="Lucro"

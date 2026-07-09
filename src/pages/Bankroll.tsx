@@ -21,10 +21,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/StatCard";
 import { computeBankroll, computeMetrics } from "@/lib/metrics";
-import { formatCurrency, formatDateTime, formatPercent } from "@/lib/format";
+import { isSettled } from "@/lib/calc";
+import { formatCurrency, formatDateTime, formatPercent, formatWithUnits } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Sparkles, Wallet, PiggyBank, TrendingUp, TrendingDown, Target, Gauge, Ruler, ListChecks } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, Line, LineChart, Legend } from "recharts";
+import { useReducedMotion } from "framer-motion";
 
 export default function BankrollPage() {
   useEffect(() => { document.title = "Banca · Bankroll Pro"; }, []);
@@ -40,6 +42,43 @@ export default function BankrollPage() {
   const metrics = useMemo(() => computeMetrics(bets), [bets]);
   const roiInitial = profile && Number(profile.initial_bankroll) > 0 ? (bank.betsProfit / Number(profile.initial_bankroll)) * 100 : 0;
   const roiCapital = bank.capitalDeposited > 0 ? (bank.betsProfit / bank.capitalDeposited) * 100 : 0;
+  const reduce = useReducedMotion();
+
+  // Evolucao historica: banca total e lucro acumulado (so apostas), por dia.
+  const evolucaoBanca = useMemo(() => {
+    const initial = Number(profile?.initial_bankroll ?? 0);
+    // Delta por dia: apostas (net_profit) e caixa (deposito/bonus/ajuste + ; saque -).
+    const deltaDia = new Map<number, { apostas: number; caixa: number }>();
+    const bump = (t: number, key: "apostas" | "caixa", v: number) => {
+      const cur = deltaDia.get(t) ?? { apostas: 0, caixa: 0 };
+      cur[key] += v;
+      deltaDia.set(t, cur);
+    };
+    for (const b of bets) {
+      if (!isSettled(b.status)) continue;
+      const d = new Date(b.bet_date); d.setHours(0, 0, 0, 0);
+      bump(d.getTime(), "apostas", Number(b.net_profit || 0));
+    }
+    for (const t of txs) {
+      let v = 0;
+      if (t.tx_type === "deposit" || t.tx_type === "bonus" || t.tx_type === "adjustment") v = Number(t.amount);
+      else if (t.tx_type === "withdrawal") v = -Number(t.amount);
+      else continue; // transfer / unit_change nao afetam saldo
+      const d = new Date(t.tx_date); d.setHours(0, 0, 0, 0);
+      bump(d.getTime(), "caixa", v);
+    }
+    let banca = initial;
+    let lucro = 0;
+    const out: Array<{ t: number; banca: number; lucro: number }> = [];
+    for (const t of Array.from(deltaDia.keys()).sort((a, b) => a - b)) {
+      const d = deltaDia.get(t)!;
+      banca += d.apostas + d.caixa;
+      lucro += d.apostas;
+      out.push({ t, banca, lucro });
+    }
+    if (out.length === 0) out.push({ t: Date.now(), banca: initial, lucro: 0 });
+    return out;
+  }, [bets, txs, profile]);
 
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TxType>("deposit");
@@ -162,6 +201,31 @@ export default function BankrollPage() {
               ))}
             </Bar>
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="surface p-4">
+        <h3 className="text-sm font-semibold mb-1">Evolução da banca</h3>
+        <p className="text-xs text-muted-foreground mb-3">Banca total (com caixa) e lucro acumulado só de apostas, ao longo do tempo.</p>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={evolucaoBanca}>
+            <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="t" type="number" domain={["dataMin", "dataMax"]} minTickGap={48}
+              tickFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+              stroke="hsl(var(--muted-foreground))" fontSize={11}
+            />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <Tooltip
+              contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+              labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+              formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)}
+              labelFormatter={(t: number) => new Date(t).toLocaleDateString("pt-BR")}
+            />
+            <Legend />
+            <Line type="monotone" dataKey="banca" name="Banca total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} isAnimationActive={!reduce} />
+            <Line type="monotone" dataKey="lucro" name="Lucro (apostas)" stroke="hsl(var(--accent))" strokeWidth={2} dot={false} isAnimationActive={!reduce} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
 

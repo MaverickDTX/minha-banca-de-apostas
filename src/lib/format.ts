@@ -10,6 +10,19 @@ export function formatCurrency(value: number | null | undefined, currency = "BRL
     return `R$ ${v.toFixed(2)}`;
   }
 }
+/** Valor monetário seguido da conversão em unidades: "R$ 50,00 (2.00 u)".
+ *  Sem unit_value (nulo/zero), retorna apenas o valor em moeda. */
+export function formatWithUnits(
+  value: number | null | undefined,
+  currency: string,
+  unitValue: number | null | undefined,
+): string {
+  const rs = formatCurrency(value, currency);
+  const uv = Number(unitValue ?? 0);
+  if (!uv || uv <= 0) return rs;
+  const u = (Number(value ?? 0) / uv).toFixed(2);
+  return `${rs} (${u} u)`;
+}
 
 export function formatNumber(value: number | null | undefined, digits = 2): string {
   const v = Number(value ?? 0);
