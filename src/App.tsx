@@ -16,6 +16,7 @@ const NewBet = lazy(() => import("./pages/NewBet"));
 const Bankroll = lazy(() => import("./pages/Bankroll"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const CalendarPage = lazy(() => import("./pages/Calendar"));
+const MobileGate = lazy(() => import("./components/mobile/MobileGate"));
 const ImportExport = lazy(() => import("./pages/ImportExport"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/inicio" element={<MobileGate />} />
                 <Route path="/apostas" element={<Bets />} />
                 <Route path="/apostas/:id" element={<NewBet />} />
                 <Route path="/nova-aposta" element={<NewBet />} />

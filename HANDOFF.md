@@ -1,6 +1,70 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Data: 2026-07-08 (última atualização; histórico abaixo)
+Data: 2026-07-09 (última atualização; histórico abaixo)
+
+## ✅ Sessão 2026-07-09 — P-A tooltip scroll/dismiss + P-C guard viewport /inicio + P-D logo clicável
+
+### P-A · Tooltip recharts — dismiss por scroll/touchmove + timeout 4s (Dashboard + Análises)
+Implementadas as duas correções combinadas conforme decisão do HANDOFF:
+- **Dismiss por scroll + touchmove**: listeners de `scroll` e `touchmove` no `document` disparam `mouseleave` no chart tocado.
+- **Auto-dismiss por timeout de 4s** como fallback (cobre gráfico pequeno sem scroll).
+- **Touch-fora** preservado: `touchstart` fora do `.recharts-wrapper` também fecha.
+- Comportamento: tocar barra → mostra tooltip; rolar OU esperar 4s OU tocar fora → fecha.
+- Mesmo padrão aplicado em `src/pages/Analytics.tsx`. Hover desktop intacto (não interfere).
+
+### P-C — Grid 3×2 (`/inicio`) exclusivamente mobile
+- Criado `src/lib/use-media-query.ts` (hook `useMediaQuery`).
+- Criado `src/components/mobile/MobileGate.tsx`: guard de viewport — desktop (≥ md) redireciona com `<Navigate to="/" replace>`, mobile renderiza `<MobileHome />`.
+- Rota `/inicio` em `src/App.tsx` aponta para `MobileGate` (antes apontava direto para `MobileHome`).
+- Verificado: desktop abre `/inicio` → cai no Dashboard sem grid solto; mobile 338px mostra o grid 3×2 normalmente.
+
+### P-D — Logo "Bankroll Pro" clicável
+- `src/components/layout/AppSidebar.tsx`: `<div>` estático substituído por `<Link to={isMobile ? "/inicio" : "/"}>`.
+- `group-data-[collapsible=icon]:hidden` preservado no texto.
+- `setOpenMobile(false)` no clique (consistente com os NavLinks).
+- Desktop: logo leva para `/` (Dashboard). Mobile: logo leva para `/inicio`.
+
+### Arquivos novos
+- `src/lib/use-media-query.ts`
+- `src/components/mobile/MobileGate.tsx`
+
+### Arquivos alterados
+- `src/App.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/pages/Analytics.tsx`
+- `src/components/layout/AppSidebar.tsx`
+
+### Verificação
+- `tsc --noEmit` OK, `vitest run` (109/109) OK via fluxo direto (não off-mount — P-A, P-C, P-D não dependem de dados mockados/API).
+- Teste real (Playwright headless): login OK, redirect desktop OK, grid mobile 6 itens OK, tooltip hover desktop OK, logo clicável OK.
+
+### Estado de commit
+- **Aguardando commit**: src/lib/use-media-query.ts, src/components/mobile/MobileGate.tsx, src/App.tsx, src/pages/Dashboard.tsx, src/pages/Analytics.tsx, src/components/layout/AppSidebar.tsx, HANDOFF.md.
+- Verificação: `tsc --noEmit` + `vitest run` (109/109) OK — via execução direta (confiável para arquivos que não dependem de dados mockados/API).
+- **Passo 0 (login)**: confirmado via Playwright headless — `teste@teste.com` / `teste` acessa `/auth`, submete form, Dashboard carrega com "Visão geral".
+- **Teste real**: Playwright headless confirmou (1) desktop /inicio redireciona para /, (2) mobile 338px mostra grid 3×2 com 6 atalhos + botão "Nova aposta", (3) logo tem link / no desktop e /inicio no mobile (sidebar sheet).
+- Commitar pelo Windows (regra FUSE).
+
+## ✅ Sessão 2026-07-08 (3) — MobileHome + proteção overflow Dashboard + atalho Import/Export em Settings
+
+### Dashboard — proteção contra overflow mobile
+Adicionado `overflow-x-hidden` e `min-w-0` no container de gráficos (`grid lg:grid-cols-3`). Após medição com probe a 338px (Dashboard com dados mockados) não foram detectados elementos excedentes; a proteção é preventiva, especialmente no `YAxis width={95}` e `ResponsiveContainer` que podem não recolher no primeiro render.
+
+### MobileHome — página inicial mobile (`/inicio`)
+- Novo componente `src/components/mobile/MobileHome.tsx`: grid `grid-cols-3` com 6 células (Dashboard, Apostas, Banca, Análises, Calendário, Config.) + barra verde full-width "Nova aposta" apontando para `/nova-aposta`.
+- Renderizado apenas abaixo de `md` (sidebar fica oculta, layout mobile).
+- Rota adicionada em `src/App.tsx` (`/inicio`).
+
+### Settings — atalho para Importar/Exportar
+Adicionado box "Importar / Exportar" em `Settings.tsx` (antes da seção Aparência) com botão link para `/importar`. Telegram já existia em Settings; agora Import/Export também fica acessível sem precisar do grid mobile.
+
+### Arquivos novos
+- `src/components/mobile/MobileHome.tsx`
+- `src/lib/navigation.ts` (criado pelo agente anterior)
+
+### Estado de commit
+- **Aguardando commit**: todos os arquivos alterados nesta e na sessão anterior (BetCard.tsx, Dashboard.tsx, Analytics.tsx, App.tsx, Settings.tsx, MobileHome.tsx, navigation.ts, HANDOFF.md).
+- Verificação: `tsc --noEmit` + `vitest run` (109/109) OK via fluxo canônico off-mount.
 
 ## ✅ Sessão 2026-07-08 (2) — Ajuste fino BetCard + tooltip recharts mobile
 
@@ -15,7 +79,7 @@ Data: 2026-07-08 (última atualização; histórico abaixo)
 O fix anterior disparava `mouseleave` em todos os charts em cada `touchend` — corria antes do recharts processar o toque, então o tooltip nunca aparecia. Novo comportamento: "tap no chart → mostra, tap fora → esconde". Um `touchstart` listener rastreia qual chart foi tocado; no toque seguinte fora dele, dispara `mouseleave` só naquele SVG. Comportamento natural de mobile, sem interferir no hover desktop.
 
 ### Estado de commit
-- **Aguardando commit**: BetCard.tsx, Dashboard.tsx, Analytics.tsx, HANDOFF.md.
+- Commitado junto com a sessão (3) abaixo.
 - Verificação: `tsc --noEmit` + `vitest run` (109/109) OK via fluxo canônico off-mount.
 
 ## ✅ Sessão 2026-07-08 — Refinamentos do BetCard iterados com o usuário + confirmação de exclusão em Banca
@@ -42,11 +106,100 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 - Verificação: `tsc --noEmit` OK via fluxo canônico off-mount.
 
 ### Backlog atualizado (ordem de relevância)
-1. Tooltip do recharts preso após tap em mobile (Dashboard/Análises) — opcional, registrado na sessão mobile.
-2. Teste mobile real das demais telas (Apostas, Análises, Banca, Nova aposta) — só o Dashboard foi validado em aparelho.
-3. #26 constantes duplicadas (`DAY_NAMES` em 3 arquivos, `CHART_RANGES`/`PRESETS` em 2), #33 lint `unused-imports`, #32 tipos gerados não usados, #34 docs antigos, #35 tema claro com hue antigo.
-4. #15b apagar conta (exige Edge Function com service role + confirmação forte).
-5. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
+1. **[RESOLVIDO 2026-07-09] P-A — Tooltip do recharts preso no mobile** — fix com scroll/touchmove + timeout 4s (Dashboard + Análises).
+1b. **[RESOLVIDO 2026-07-09] P-C — Grid 3×2 (`/inicio`) vazando para o desktop** — guard de viewport redireciona desktop para `/`.
+1c. **[RESOLVIDO 2026-07-09] P-D — Logo "Bankroll Pro" clicável → Home** — Link com rota responsiva.
+2. Teste mobile real das demais telas (Apostas, Análises, Banca, Nova aposta).
+5. #26 constantes duplicadas (`DAY_NAMES` em 3 arquivos, `CHART_RANGES`/`PRESETS` em 2), #33 lint `unused-imports`, #32 tipos gerados não usados, #34 docs antigos, #35 tema claro com hue antigo.
+6. #15b apagar conta (exige Edge Function com service role + confirmação forte).
+7. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
+
+## 🔧 PENDÊNCIAS NOVAS (2026-07-08, aguardando execução)
+
+### ✅ P-A · "Vazamento" no Dashboard mobile = TOOLTIP DO RECHARTS PRESO — RESOLVIDO 2026-07-09
+**RESOLVIDO:** scroll/touchmove listeners + timeout 4s em Dashboard.tsx e Analytics.tsx. Ver sessão 2026-07-09.
+
+Registro histórico da causa original:
+> **ATENÇÃO ao executor:** a sessão (3) tratou isto como overflow de layout e adicionou `overflow-x-hidden`/`min-w-0` no grid de gráficos — **atacou o problema errado.** A screenshot do usuário (viewport 339px) comprova que a causa é OUTRA. A proteção de overflow pode ficar (é inócua), mas o bug real continua e é este:
+
+**Causa real (confirmada por screenshot):** o **tooltip do recharts fica preso** após o toque numa barra. Na screenshot, a caixa "2026-06 / Lucro: R$ 663,11" do gráfico "Resultado por mês" continua flutuando sobre o gráfico, sobreposta ao conteúdo — dá a impressão de "vazamento". Os KPIs, gráficos e container estão dentro do quadro; NÃO há overflow de layout.
+
+**Por que o fix de tooltip atual (Dashboard.tsx L40-55) NÃO pega este caso:**
+- O dismiss depende de um **segundo `touchstart` num alvo fora do `.recharts-wrapper`** (`else if (touchedChart)`, L46-51). Se o usuário toca a barra e depois **rola a página** (scroll não gera `touchstart` fora do chart) ou simplesmente não toca em outro ponto, o `mouseleave` nunca dispara → tooltip fica pendurado.
+- Sem `allowEscapeViewBox`/`wrapperStyle` controlado, o tooltip ainda pode extravasar a moldura do gráfico.
+
+**Correção decidida (implementar as DUAS combinadas — validar no aparelho):**
+1. **Dismiss por scroll + toque fora:** listeners de `scroll` e `touchmove` no `document` que disparam `mouseleave` no chart tocado — o usuário nunca rola querendo manter o tooltip aberto.
+2. **Auto-dismiss por timeout de 4s** como fallback: após exibir via toque, agendar `mouseleave` em 4s — cobre gráfico pequeno sem scroll (onde o scroll nunca dispara).
+- ❌ **NÃO usar `allowEscapeViewBox` como solução** — só contém o tooltip na moldura, NÃO o desprende; o tooltip continuaria preso. Descartado.
+- **Aplicar o mesmo padrão em `Analytics.tsx`.** Não interferir no hover desktop.
+
+**Arquivos-alvo:** `src/pages/Dashboard.tsx` (listener L40-55 + os 4 `<Tooltip>`), `src/pages/Analytics.tsx`.
+
+**Comando de diagnóstico:**
+```bash
+grep -nE "touchstart|touchmove|scroll|mouseleave|<Tooltip" src/pages/Dashboard.tsx src/pages/Analytics.tsx
+```
+
+**Verificação após o fix (fluxo canônico off-mount — NÃO confiar em tsc lido da montagem; SEM `vite build` — rollup win32 não roda no sandbox):**
+```bash
+rm -rf /tmp/verify && mkdir -p /tmp/verify
+git archive HEAD | tar -x -C /tmp/verify
+ln -s "$(pwd)/node_modules" /tmp/verify/node_modules
+cd /tmp/verify && npx tsc --noEmit && npx vitest run
+```
+Teste real mobile: tocar barra mostra tooltip; **rolar OU esperar 4s OU tocar fora fecha**; nada preso; desktop intacto.
+
+### ✅ P-C · Grid 3×2 (`/inicio`) VAZANDO para o DESKTOP — RESOLVIDO 2026-07-09
+**RESOLVIDO:** guard de viewport (MobileGate.tsx + useMediaQuery). Ver sessão 2026-07-09.
+
+Registro histórico:
+**Sintoma (confirmado por screenshot no PC):** no desktop, `/inicio` mostra a **sidebar completa à esquerda E o grid 3×2 flutuando no meio da tela** ao mesmo tempo. O grid deveria ser **exclusivamente mobile**.
+
+**Causa:** a rota `/inicio` (`src/App.tsx` L44) está dentro de `<Route element={<AppLayout />}>` — e o `AppLayout` sempre renderiza a sidebar. Não há gate de viewport: nem o `MobileHome` tem `md:hidden`, nem o desktop é redirecionado. `src/components/mobile/MobileHome.tsx` está correto; o problema é só o roteamento/gate.
+
+**Decisão do usuário (CONFIRMADA — opção A):** o grid 3×2 é **exclusivamente mobile**. No **desktop (≥ md), `/inicio` redireciona para `/`** (Dashboard) — a sidebar já é a navegação do desktop, o grid seria redundante. Abaixo de `md`, renderiza o `MobileHome`.
+
+**Implementação:** guard de viewport na rota `/inicio` (ex.: `<Navigate to="/" replace>` quando `md`+, via media-query/hook `useMediaQuery`) — **sem flash** do conteúdo errado no primeiro render (resolver o valor da media query antes de renderizar, não depois).
+
+**Arquivos-alvo:** `src/App.tsx` (rota `/inicio`), possível novo guard/hook de viewport.
+
+### ✅ P-D · Logo "Bankroll Pro" clicável → Home — RESOLVIDO 2026-07-09
+**RESOLVIDO:** `<Link>` com rota responsiva em AppSidebar.tsx. Ver sessão 2026-07-09.
+Registro histórico:
+**Objetivo:** clicar na logo "Bankroll Pro" (canto superior esquerdo) leva à home.
+**Estado original:** a logo no `SidebarHeader` (`src/components/layout/AppSidebar.tsx` L48-58) era um `<div>` estático, sem link.
+**Implementação:** envolver num `<Link>` do React Router — **`/inicio` no mobile** (< md), **`/` no desktop** (≥ md). Preservar o `group-data-[collapsible=icon]:hidden` do texto (sidebar recolhida).
+**Arquivos-alvo:** `src/components/layout/AppSidebar.tsx` (L48-58).
+
+### P-B · Página inicial mobile — grade de ícones 3×3 (app launcher)
+**Objetivo:** no mobile, a tela inicial do Bankroll Pro deve apresentar uma grade de ícones **3×2 (6 atalhos)** no estilo home de celular + uma barra de ação "Nova aposta" avulsa abaixo do grid.
+
+**Decisões do usuário (2026-07-08 — TODAS CONFIRMADAS, sem pendência):**
+- **Rota:** ✅ **nova rota, Dashboard intacto.** A grade é uma tela nova; o Dashboard atual permanece inalterado em mobile e desktop (não substituir). Definir o path da home (sugestão: `/inicio` ou `/menu`) e se ela é a landing após login no mobile.
+- **Layout: grade 3×2 = 6 células** (não 3×3). Layout final escolhido pelo usuário após avaliar 3×3/4×2/3×2 — 3×2 é o mais limpo/arejado. Os 6 destinos (todos rotas reais que abrem página), na ordem:
+  1. **Dashboard** → `/`
+  2. **Apostas** → `/apostas`
+  3. **Banca** → `/bankroll`
+  4. **Análises** → `/analises`
+  5. **Calendário** → `/calendario`
+  6. **Configurações** → `/configuracoes`
+- **2 destinos removidos do grid** (não somem — realocados **para dentro de Configurações**): **Importar / Exportar** (`/importar`) e **Telegram** (vínculo do bot). São ações pontuais/de setup, não uso diário; já têm afinidade natural com Configurações. **Ação de execução:** garantir que ambos fiquem acessíveis a partir da página Configurações (link/seção) antes de remover do grid, para não perder o acesso.
+- **"Nova aposta" NÃO entra no grid.** Vira **barra de ação verde avulsa, largura total do grid**, posicionada **abaixo do grid** (CTA próximo ao polegar). Ícone `Plus` (lucide) + label "Nova aposta" → navega para `/nova` (ou abre o BetForm — confirmar o comportamento atual do CTA).
+- **Aparência (tema):** o toggle claro/escuro NÃO ganha ícone na grade; permanece em Configurações, onde já é persistido.
+- **Gatilho responsivo (a definir na execução):** renderizar a home só abaixo de `md` (`block md:hidden`) ou via hook de viewport.
+
+**Esboço de implementação (a validar):**
+- Novo componente `src/components/mobile/MobileHome.tsx`:
+  - `grid grid-cols-3 gap-4` com **6 células** (2 linhas × 3 colunas); cada célula um `<Link>` (React Router) com ícone lucide + label curto, área de toque ≥ 44px (a11y), tokens de tema existentes.
+  - Abaixo do grid: barra "Nova aposta" — `<Link to="/nova">` full-width (`w-full`), fundo `bg-success`/verde primário, altura de toque confortável, ícone `Plus`.
+- Roteamento em `src/App.tsx`: registrar a nova rota da home; renderizar `MobileHome` abaixo de `md` e o conteúdo normal acima — ou redirect condicional.
+- Reusar `AppSidebar` como fonte da verdade dos destinos (evitar duplicar a lista de rotas — conecta com #26 constantes duplicadas). **Verificar os paths reais** no `AppSidebar`/router antes de hardcodar (os paths acima vieram da lista do usuário em `localhost:8080`).
+- **Configurações:** adicionar acesso a Importar/Exportar e Telegram (se ainda não houver) — confirmar se já existem seções lá ou se é preciso criar os atalhos.
+
+**Arquivos-alvo:** `src/App.tsx` (rota), novo `src/components/mobile/MobileHome.tsx`, `src/components/AppSidebar.tsx` (fonte dos destinos/paths), `src/pages/Settings.tsx` (realocar Importar/Exportar + Telegram).
+
+**Verificação:** fluxo canônico off-mount + teste mobile real (grade 3×2 aparece < md, barra "Nova aposta" abaixo do grid, cada ícone navega ao destino certo, Importar/Exportar e Telegram acessíveis via Configurações, Dashboard/desktop intactos, drawer da sidebar não conflita).
 
 ## ✅ Sessão 2026-07-07 (4) — Rodada de consistência UI (8 telas)
 

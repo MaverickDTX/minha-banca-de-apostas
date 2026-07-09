@@ -39,19 +39,41 @@ export default function Dashboard() {
   useEffect(() => { document.title = "Dashboard · Bankroll Pro"; }, []);
   useEffect(() => {
     let touchedChart: Element | null = null;
+    let dismissTimeout: ReturnType<typeof setTimeout> | null = null;
+    const dismissChart = () => {
+      if (!touchedChart) return;
+      touchedChart.querySelectorAll<SVGElement>("svg.recharts-surface").forEach((svg) => {
+        svg.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+      });
+      touchedChart = null;
+      if (dismissTimeout) { clearTimeout(dismissTimeout); dismissTimeout = null; }
+    };
+    const scheduleDismiss = () => {
+      if (dismissTimeout) clearTimeout(dismissTimeout);
+      dismissTimeout = setTimeout(dismissChart, 4000);
+    };
     const onTouchStart = (e: TouchEvent) => {
       const wrapper = (e.target as HTMLElement)?.closest?.(".recharts-wrapper");
       if (wrapper) {
+        dismissChart();
         touchedChart = wrapper;
-      } else if (touchedChart) {
-        touchedChart.querySelectorAll<SVGElement>("svg.recharts-surface").forEach((svg) => {
-          svg.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
-        });
-        touchedChart = null;
+        scheduleDismiss();
+      } else {
+        dismissChart();
       }
     };
+    const onScrollOrTouchMove = () => {
+      if (touchedChart) dismissChart();
+    };
     document.addEventListener("touchstart", onTouchStart, { passive: true });
-    return () => document.removeEventListener("touchstart", onTouchStart);
+    document.addEventListener("touchmove", onScrollOrTouchMove, { passive: true });
+    document.addEventListener("scroll", onScrollOrTouchMove, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onScrollOrTouchMove);
+      document.removeEventListener("scroll", onScrollOrTouchMove);
+      if (dismissTimeout) clearTimeout(dismissTimeout);
+    };
   }, []);
   const navigate = useNavigate();
   const { data: bets = [], isLoading } = useBets();
@@ -254,8 +276,8 @@ export default function Dashboard() {
         <span className="text-xs text-muted-foreground ml-2">Período dos gráficos</span>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <ChartCard title="Evolução da banca" className="lg:col-span-2">
+      <div className="grid lg:grid-cols-3 gap-4 min-w-0 overflow-x-hidden">
+        <ChartCard title="Evolução da banca" className="lg:col-span-2 min-w-0">
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={evolution}>
               <defs>

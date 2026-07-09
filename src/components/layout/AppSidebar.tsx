@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   ListChecks,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -42,11 +43,12 @@ export function AppSidebar() {
   const { data: profile } = useProfile();
   // No mobile a sidebar é um Sheet; navegar não fecha sozinho — fechamos no clique.
   const { setOpenMobile } = useSidebar();
+  const isMobile = !useMediaQuery("(min-width: 768px)");
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
-        <div className="flex items-center gap-2">
+        <Link to={isMobile ? "/inicio" : "/"} className="flex items-center gap-2" onClick={() => setOpenMobile(false)}>
           <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center">
             <CircleDollarSign className="h-5 w-5 text-primary" />
           </div>
@@ -54,7 +56,7 @@ export function AppSidebar() {
             <span className="font-semibold text-sidebar-foreground">Bankroll Pro</span>
             <span className="text-[11px] text-muted-foreground">Minha Banca de Apostas</span>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
