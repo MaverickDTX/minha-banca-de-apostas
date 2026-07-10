@@ -406,6 +406,7 @@ function Metric({
           tone === "negative" && "negative",
         )}
       >
+        {value}
       </span>
     </div>
   );
