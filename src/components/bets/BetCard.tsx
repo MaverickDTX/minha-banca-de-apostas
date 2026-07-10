@@ -328,7 +328,7 @@ export function BetCard({
           value={
             <>
               {formatCurrency(Number(bet.stake_amount), currency, unitValue)}
-              {units != null && (
+              {currency !== "u" && units != null && (
                 <span className="text-muted-foreground"> · {formatNumber(units, 2)}u</span>
               )}
             </>
@@ -406,7 +406,6 @@ function Metric({
           tone === "negative" && "negative",
         )}
       >
-        {value}
       </span>
     </div>
   );
