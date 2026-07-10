@@ -10,7 +10,18 @@ Data: 2026-07-09 (última atualização; histórico abaixo)
 ### #8 (teste 401) — DIFERIDO
 - O webhook é edge function Deno (não importável na suíte vitest atual, que só varre `src/**` em jsdom). Um teste vitest exigiria refatorar o handler (extrair `handleRequest` pura). Decisão do usuário: **diferir** — o comportamento 401 já existe e é trivial (`if (secret !== WEBHOOK_SECRET) return 401`), não justifica a refatoração agora.
 
-### #9 (grants/RLS) — AUDITADO ao vivo, migration NÃO aplicada (por decisão)
+### #9 (grants/RLS) — ✅ RESOLVIDO — migration APLICADA e verificada ao vivo (2026-07-09)
+- Migration `20260710012600_harden_business_tables_grants.sql` aplicada no banco (`apply_migration`, success).
+- **Verificações pós (todas passaram):**
+  - 3a — `anon` removido de bets/bet_legs/bankroll_transactions/profiles; `authenticated`/`service_role` intactos.
+  - 3b — policies `tpb_deny_non_service` e `ts_deny_non_service` criadas (`USING(false)`).
+  - 3c — `FORCE ROW LEVEL SECURITY` ativo nas 4 tabelas de negócio.
+  - 3d — advisors `rls_enabled_no_policy` (telegram_pending_bets/settings) **sumiram**.
+  - 3e (funcional) — sessão `authenticated` do dono (`63640057-…`) vê seus dados: 1425 bets, 587 legs, 8 tx, 1 profile. **App não quebrou.**
+  - contraprova — role `anon` agora recebe `permission denied for table bets` (antes só a RLS filtrava; agora nem grant existe).
+- **Pendência residual (não-migration):** habilitar "Leaked Password Protection" no painel (Authentication → Providers/Policies). Advisor `auth_leaked_password_protection` (WARN) segue aberto até isso.
+
+### #9 — registro histórico da auditoria (migration originalmente escrita p/ aplicar depois)
 - Supabase conectado nesta sessão (projeto `cttdibubqgrpkdzhojtn`). Inspeção ao vivo de grants + policies + advisors. **Nada alterado no banco.**
 - **Achado principal:** não há vazamento explorável. Todas as tabelas de negócio (`bets`, `bet_legs`, `bankroll_transactions`, `profiles`) têm RLS + policies `auth.uid() = user_id`, sem `USING (true)`.
 - **Folga (defesa-em-profundidade):** `anon` tem grant amplo (incl. DELETE/TRUNCATE) nas 4 tabelas de negócio — inócuo hoje (RLS bloqueia, `anon` não tem `auth.uid()`), mas privilégio desnecessário. As tabelas telegram já foram endurecidas antes (migration `..._telegram_tables_tighten_grants.sql`); as de negócio não.
@@ -242,7 +253,7 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 4. **[RESOLVIDO 2026-07-09] P-G — Varredura overflow mobile** — todas as telas conferidas: OK, cobertas por StatCard ou overflow-x-auto.
 5. **[RESOLVIDO / N-A 2026-07-09 (4)]** #26 constantes duplicadas → consolidadas em `src/lib/constants.ts`. #33 → não havia `unused-imports`; corrigidos 2× `no-explicit-any` no telegram-webhook (0 erros de eslint). #32/#34/#35 → não-aplicáveis (types.ts em uso; só MOTION-SPEC.md; tema claro já verde). Ver sessão (4).
 6. **[DIFERIDO — reavaliar ao abrir para outros usuários]** #15b apagar conta (exige Edge Function com service role + confirmação forte). Enquanto for single-user, exclusão = SQL direto no Supabase; só vira prioridade quando houver terceiros (obrigação LGPD art. 18).
-7. **[PARCIAL 2026-07-09 (5)]** Bot Telegram: ✅ `getPendingBet()` morta removida. **#8 (teste 401) DIFERIDO** (exigiria refatorar o webhook Deno p/ vitest; comportamento já existe e é trivial). **#9 (grants) AUDITADO** — sem vazamento; folga de grant `anon` nas tabelas de negócio documentada em `SECURITY-AUDIT-2026-07-09.md`; migration de hardening adiada (single-user). Reavaliar #8/#9 ao abrir para outros usuários.
+7. **[PARCIAL 2026-07-09 (5)]** Bot Telegram: ✅ `getPendingBet()` morta removida. **#8 (teste 401) DIFERIDO** (exigiria refatorar o webhook Deno p/ vitest; comportamento já existe e é trivial). **#9 (grants) ✅ RESOLVIDO** — migration `20260710012600_harden_business_tables_grants.sql` aplicada e verificada ao vivo (anon revogado, force RLS, policies de negação, app intacto). Só resta habilitar leaked-password no painel. Auditoria em `SECURITY-AUDIT-2026-07-09.md`. **#8 (teste 401) DIFERIDO.**
 
 ## 🔧 PENDÊNCIAS NOVAS (2026-07-08, aguardando execução)
 
