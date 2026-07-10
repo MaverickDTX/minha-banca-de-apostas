@@ -22,6 +22,7 @@ import { BetCard } from "@/components/bets/BetCard";
 import { BetsPagination } from "@/components/bets/BetsPagination";
 import { legFromBet } from "@/components/bets/LegsEditor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 
@@ -256,9 +257,24 @@ export default function Bets() {
         </div>
         <div className="flex items-center gap-2">
           <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)} variant="outline" size="sm">
-            <ToggleGroupItem value="cards" aria-label="Cards" title="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
-            <ToggleGroupItem value="compact" aria-label="Compacto" title="Compacto"><List className="h-4 w-4" /></ToggleGroupItem>
-            <ToggleGroupItem value="table" aria-label="Tabela" title="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value="cards" aria-label="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>Cards</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value="compact" aria-label="Compacto"><List className="h-4 w-4" /></ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>Compacto</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value="table" aria-label="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>Tabela</TooltipContent>
+            </Tooltip>
           </ToggleGroup>
           <Button asChild><Link to="/nova-aposta"><PlusCircle className="h-4 w-4 mr-2" />Nova aposta</Link></Button>
         </div>
