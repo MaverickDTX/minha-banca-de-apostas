@@ -256,9 +256,9 @@ export default function Bets() {
         </div>
         <div className="flex items-center gap-2">
           <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)} variant="outline" size="sm">
-            <ToggleGroupItem value="cards" aria-label="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
-            <ToggleGroupItem value="compact" aria-label="Compacto"><List className="h-4 w-4" /></ToggleGroupItem>
-            <ToggleGroupItem value="table" aria-label="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="cards" aria-label="Cards" title="Cards"><LayoutGrid className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="compact" aria-label="Compacto" title="Compacto"><List className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="table" aria-label="Tabela" title="Tabela"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
           </ToggleGroup>
           <Button asChild><Link to="/nova-aposta"><PlusCircle className="h-4 w-4 mr-2" />Nova aposta</Link></Button>
         </div>
@@ -493,7 +493,7 @@ export default function Bets() {
                     className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{formatDateTime(b.bet_date)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(b.bet_date)}</TableCell>
                 <TableCell>{b.sport || "—"}</TableCell>
                 <TableCell>
                   {b.bet_type === "multipla" ? (
@@ -524,7 +524,7 @@ export default function Bets() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono">{formatNumber(Number(b.odds), 2)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(Number(b.stake_amount), currency, profile?.unit_value)}</TableCell>
+                <TableCell className="text-right font-mono whitespace-nowrap">{formatCurrency(Number(b.stake_amount), currency, profile?.unit_value)}</TableCell>
                 <TableCell>
                   <StatusBadgePop status={b.status}>
                     <Badge variant="outline" className={STATUS_COLORS[b.status]}>{STATUS_LABELS[b.status]}</Badge>

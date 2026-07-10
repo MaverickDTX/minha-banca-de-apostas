@@ -78,7 +78,7 @@ export function BetCard({
   const isMultiple = bet.bet_type === "multipla";
   // Data da aposta + horário do evento quando disponível (ex.: "11/07 · 20:30").
   const eventTime = formatTime(bet.event_date);
-  const dateLabel = eventTime ? `${formatDate(bet.bet_date)} · ${eventTime}` : formatDate(bet.bet_date);
+  const dateLabel = eventTime ? `${formatDate(bet.bet_date)} • ${eventTime}` : formatDate(bet.bet_date);
   const [expanded, setExpanded] = useState(false);
   const { data: legs = [] } = useBetLegs(isMultiple ? bet.id : undefined);
 
