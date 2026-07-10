@@ -27,16 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar, Cell, ScatterChart, Scatter } from "recharts";
 import { cn } from "@/lib/utils";
-
-const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-const PRESETS = [
-  { key: "7" as const, days: 7, label: "7d" },
-  { key: "14" as const, days: 14, label: "14d" },
-  { key: "30" as const, days: 30, label: "30d" },
-  { key: "90" as const, days: 90, label: "90d" },
-  { key: "all" as const, days: null, label: "Tudo" },
-];
+import { DAY_NAMES, RANGE_PRESETS } from "@/lib/constants";
 
 export default function Analytics() {
   const reduce = useReducedMotion();
@@ -211,7 +202,7 @@ export default function Analytics() {
 
       <div className="surface p-3 flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1 mr-1">
-          {PRESETS.map((p) => (
+          {RANGE_PRESETS.map((p) => (
             <Button
               key={p.key}
               type="button"

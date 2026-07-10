@@ -71,8 +71,11 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="font-medium min-w-[160px] text-center capitalize">
-            {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(cursor)}
+          <div className="font-medium min-w-[160px] text-center">
+            {(() => {
+              const label = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(cursor);
+              return label.charAt(0).toUpperCase() + label.slice(1);
+            })()}
           </div>
           <Button variant="outline" size="icon" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="ghost" size="sm" onClick={() => setCursor(new Date())}>Hoje</Button>

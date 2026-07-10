@@ -2,6 +2,40 @@
 
 Data: 2026-07-09 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-09 (4) — Fix "Julho De 2026" no calendário + limpeza de dívida técnica (#26, #33 parcial)
+
+### Fix · Header do Calendário capitalizava a preposição ("Julho **De** 2026")
+- Causa: `className="... capitalize"` (Tailwind `text-transform: capitalize`) capitaliza **cada palavra** do resultado de `Intl.DateTimeFormat("pt-BR", { month:"long", year:"numeric" })` → "de" virava "De".
+- Correção: removido o `capitalize`; capitaliza só a 1ª letra da string no JS. Renderiza "Julho de 2026". Arquivo: `src/pages/Calendar.tsx` (L74-79).
+
+### #26 · Constantes duplicadas consolidadas
+- Novo `src/lib/constants.ts` com `DAY_NAMES` e `RANGE_PRESETS` (único, com `key: AnalyticsPreset` + `days` + `label`).
+- `DAY_NAMES` removido de `analyticsUrl.ts` e `Analytics.tsx` → importado de `constants.ts`.
+- `PRESETS` removido de `Analytics.tsx` e `Dashboard.tsx` → `RANGE_PRESETS`. As duas cópias divergiam (Analytics tinha `key`, Dashboard não); a versão consolidada tem `key` e o Dashboard usa só `days`/`label`.
+
+### #33 · Lint — reavaliado (parcialmente desatualizado)
+- **Não havia `unused-imports`.** Os únicos erros reais eram 2× `@typescript-eslint/no-explicit-any` no `supabase/functions/telegram-webhook/index.ts`.
+- Corrigido: adicionada interface mínima `TelegramUpdate` (+ `TelegramMessage`/`TelegramCallbackQuery`/`TelegramChat`/`TelegramPhotoSize`) cobrindo só os campos consumidos; `processUpdate` e o parse do body agora tipados. **0 erros de eslint.**
+- Restam 11 warnings cosméticos (`react-refresh/only-export-components` em componentes shadcn/ui gerados + 3 `exhaustive-deps`) — decisão: **manter** (mexer nas deps tem risco de comportamento; react-refresh é gerado).
+
+### #32 / #34 / #35 · Não-aplicáveis / desatualizados (pulados por decisão do usuário)
+- **#32** (tipos gerados não usados): `types.ts` está **em uso** (`Database` no client, `Json` em `useBets`). Nada a remover.
+- **#34** (docs antigos): só `MOTION-SPEC.md` — mantido como referência.
+- **#35** (tema claro hue antigo): tema claro já usa verde 152° em primary/success; sem hue obviamente errado. Nada a fazer.
+
+### ⚠️ Nota de ambiente (truncamento FUSE — CONFIRMADO nesta sessão)
+- Edits que **encurtam** um arquivo via file-tool deixaram **NUL bytes de padding** (analyticsUrl/Analytics/Dashboard) ou **truncaram o final** (telegram-webhook perdeu ~16 linhas do `serve(...)`). Sintoma no lint/swc: `Parsing error: Invalid character` / `'}' expected`; `tsc` não pega (lê via symlink de tsconfig).
+- Mitigação aplicada: `tr -d '\000'` nos arquivos com padding; telegram-webhook reconstruído do HEAD + reaplicação das mudanças via script. **Sempre conferir `tail`/`wc -l` e rodar eslint (não só tsc) após edits que reduzem tamanho.**
+
+### Verificação
+- Fluxo canônico off-mount (`git archive HEAD` + sobreposição dos 5 arquivos editados + symlink node_modules):
+  - `npx tsc --noEmit` → **0 erros**
+  - `npx eslint .` → **0 erros** (11 warnings mantidos)
+  - `npx vitest run` → **119 testes, todos passando**
+
+### Estado de commit
+- **Working tree sujo, aguardando commit.** Arquivos: `src/pages/Calendar.tsx`, `src/lib/constants.ts` (novo), `src/lib/analyticsUrl.ts`, `src/pages/Analytics.tsx`, `src/pages/Dashboard.tsx`, `supabase/functions/telegram-webhook/index.ts`, `HANDOFF.md`.
+
 ## ✅ Sessão 2026-07-09 (3) — Pendência 1 (calendário/horário) + Pendência 2 (unidade "u" como moeda)
 
 ### ⚠️ NOTA DE AMBIENTE (ler antes de editar) — truncamento por FUSE
@@ -188,8 +222,8 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 2. **[RESOLVIDO 2026-07-09] P-E — Calendário quebrado no mobile** — valor R$ oculto abaixo de sm.
 3. **[RESOLVIDO 2026-07-09] P-F — Card "Total Apostado" vaza no mobile** — `.stat-value` responsivo + min-w-0.
 4. **[RESOLVIDO 2026-07-09] P-G — Varredura overflow mobile** — todas as telas conferidas: OK, cobertas por StatCard ou overflow-x-auto.
-5. #26 constantes duplicadas (`DAY_NAMES` em 3 arquivos, `CHART_RANGES`/`PRESETS` em 2), #33 lint `unused-imports`, #32 tipos gerados não usados, #34 docs antigos, #35 tema claro com hue antigo.
-6. #15b apagar conta (exige Edge Function com service role + confirmação forte).
+5. **[RESOLVIDO / N-A 2026-07-09 (4)]** #26 constantes duplicadas → consolidadas em `src/lib/constants.ts`. #33 → não havia `unused-imports`; corrigidos 2× `no-explicit-any` no telegram-webhook (0 erros de eslint). #32/#34/#35 → não-aplicáveis (types.ts em uso; só MOTION-SPEC.md; tema claro já verde). Ver sessão (4).
+6. **[DIFERIDO — reavaliar ao abrir para outros usuários]** #15b apagar conta (exige Edge Function com service role + confirmação forte). Enquanto for single-user, exclusão = SQL direto no Supabase; só vira prioridade quando houver terceiros (obrigação LGPD art. 18).
 7. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
 
 ## 🔧 PENDÊNCIAS NOVAS (2026-07-08, aguardando execução)
@@ -290,7 +324,10 @@ Registro histórico:
 **Implementação:** envolver num `<Link>` do React Router — **`/inicio` no mobile** (< md), **`/` no desktop** (≥ md). Preservar o `group-data-[collapsible=icon]:hidden` do texto (sidebar recolhida).
 **Arquivos-alvo:** `src/components/layout/AppSidebar.tsx` (L48-58).
 
-### P-B · Página inicial mobile — grade de ícones 3×3 (app launcher)
+### ✅ P-B · Página inicial mobile — grade de ícones (app launcher) — RESOLVIDO (confirmado pelo usuário 2026-07-09)
+**RESOLVIDO:** `MobileHome.tsx` (grid 3×2 + barra "Nova aposta"), rota `/inicio` com guard de viewport, Import/Export e Telegram realocados para Configurações. Registro de design mantido abaixo.
+
+
 **Objetivo:** no mobile, a tela inicial do Bankroll Pro deve apresentar uma grade de ícones **3×2 (6 atalhos)** no estilo home de celular + uma barra de ação "Nova aposta" avulsa abaixo do grid.
 
 **Decisões do usuário (2026-07-08 — TODAS CONFIRMADAS, sem pendência):**

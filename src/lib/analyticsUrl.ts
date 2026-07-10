@@ -1,5 +1,6 @@
 import type { Bet } from "@/hooks/useBets";
 import { oddsBucket } from "./metrics";
+import { DAY_NAMES } from "./constants";
 
 export const ANALYTICS_TABS = [
   "esporte",
@@ -30,8 +31,6 @@ export type AnalyticsUrlParams = {
   view?: "winrate";
   minStake?: number;
 };
-
-const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /** Chave de agrupamento alinhada com Analytics.tsx (mesma lógica das tabelas). */
 export function getBetGroupKey(bet: Bet, tab: AnalyticsTab): string {

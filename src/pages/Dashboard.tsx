@@ -17,6 +17,7 @@ import { isSettled, STATUS_LABELS } from "@/lib/calc";
 import { cn } from "@/lib/utils";
 import { CountUp } from "@/components/CountUp";
 import { DUR, EASE, RISE, STAGGER } from "@/lib/motion";
+import { RANGE_PRESETS } from "@/lib/constants";
 
 const stagger: Variants = {
   hidden: {},
@@ -28,13 +29,6 @@ const fadeUp: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: DUR.reveal, ease: EASE.out } },
 };
 
-const PRESETS = [
-  { days: 7, label: "7d" },
-  { days: 14, label: "14d" },
-  { days: 30, label: "30d" },
-  { days: 90, label: "90d" },
-  { days: null, label: "Tudo" },
-] as const;
 
 export default function Dashboard() {
   const [chartDays, setChartDays] = useState<number | null>(30);
@@ -289,7 +283,7 @@ export default function Dashboard() {
       )}
 
       <div className="flex items-center gap-1">
-        {PRESETS.map((r) => (
+        {RANGE_PRESETS.map((r) => (
           <Button
             key={r.label}
             type="button"

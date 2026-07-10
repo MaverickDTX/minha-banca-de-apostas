@@ -17,6 +17,39 @@ const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// ── Tipos mínimos do payload do Telegram (só os campos que consumimos) ──
+
+interface TelegramPhotoSize {
+  file_id: string;
+  file_unique_id?: string;
+  width?: number;
+  height?: number;
+  file_size?: number;
+}
+
+interface TelegramChat {
+  id: number;
+}
+
+interface TelegramMessage {
+  message_id: number;
+  chat: TelegramChat;
+  text?: string;
+  caption?: string;
+  photo?: TelegramPhotoSize[];
+}
+
+interface TelegramCallbackQuery {
+  id: string;
+  data?: string;
+  message: TelegramMessage;
+}
+
+interface TelegramUpdate {
+  callback_query?: TelegramCallbackQuery;
+  message?: TelegramMessage;
+}
+
 // ── Supabase helpers ──────────────────────────────────────────
 
 async function callRpc(name: string, params: Record<string, unknown>): Promise<unknown> {
@@ -403,7 +436,7 @@ async function handleCallbackQuery(
 
 // ── Update processing (background) ────────────────────────────
 
-async function processUpdate(update: any): Promise<void> {
+async function processUpdate(update: TelegramUpdate): Promise<void> {
   try {
     // Handle callback query
     const cq = update.callback_query;
@@ -495,16 +528,16 @@ serve((req) => {
   //    O parse precisa ocorrer aqui (o corpo do request não sobrevive ao
   //    término do handler); só processUpdate roda via EdgeRuntime.waitUntil.
   return (async () => {
-    let update: unknown;
+    let update: TelegramUpdate;
     try {
-      update = await req.json();
+      update = (await req.json()) as TelegramUpdate;
     } catch {
       // Corpo inválido: ainda respondemos 200 para o Telegram não reenviar.
       return new Response("OK", { status: 200 });
     }
 
     console.log("Update:", JSON.stringify(update).slice(0, 500));
-    EdgeRuntime.waitUntil(processUpdate(update as any));
+    EdgeRuntime.waitUntil(processUpdate(update));
     return new Response("OK", { status: 200 });
   })();
 });
