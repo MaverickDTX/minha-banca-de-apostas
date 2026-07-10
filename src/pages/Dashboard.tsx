@@ -174,7 +174,9 @@ export default function Dashboard() {
       groupBy(
         bets.filter((b) => isSettled(b.status)),
         (b) => getBetGroupKey(b, "esporte"),
-      ).map((g) => ({ name: g.key, lucro: g.metrics.netProfit })),
+      )
+        .map((g) => ({ name: g.key, lucro: g.metrics.netProfit }))
+        .sort((a, b) => b.lucro - a.lucro),
     [bets],
   );
 
@@ -395,7 +397,7 @@ export default function Dashboard() {
             <BarChart data={bySport} layout="vertical">
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-              <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={95} />
+              <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} width={95} interval={0} />
               <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} labelStyle={{ color: "hsl(var(--popover-foreground))" }} itemStyle={{ color: "hsl(var(--popover-foreground))" }} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} formatter={(v: number) => formatWithUnits(v, currency, profile?.unit_value)} />
               <Bar
                 dataKey="lucro"
