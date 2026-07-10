@@ -147,14 +147,6 @@ async function resolveUser(chatId: number): Promise<string | null> {
   return row ? (row.user_id as string) : null;
 }
 
-async function getPendingBet(chatId: number): Promise<Record<string, unknown> | null> {
-  return queryOne("telegram_pending_bets", {
-    chat_id: `eq.${chatId}`,
-    expires_at: "gt.now",
-    order: "created_at.desc",
-  });
-}
-
 async function getCorrectionPending(chatId: number): Promise<Record<string, unknown> | null> {
   return queryOne("telegram_pending_bets", {
     chat_id: `eq.${chatId}`,

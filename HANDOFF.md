@@ -2,6 +2,24 @@
 
 Data: 2026-07-09 (última atualização; histórico abaixo)
 
+## ✅ Sessão 2026-07-09 (5) — Item 7 do backlog: getPendingBet() morta removida + auditoria de segurança (#9) + #8 diferido
+
+### getPendingBet() — função morta removida
+- `supabase/functions/telegram-webhook/index.ts`: `getPendingBet()` (0 usos) removida. Restam íntegras `getCorrectionPending()` e as demais. Sem NUL, arquivo fecha corretamente.
+
+### #8 (teste 401) — DIFERIDO
+- O webhook é edge function Deno (não importável na suíte vitest atual, que só varre `src/**` em jsdom). Um teste vitest exigiria refatorar o handler (extrair `handleRequest` pura). Decisão do usuário: **diferir** — o comportamento 401 já existe e é trivial (`if (secret !== WEBHOOK_SECRET) return 401`), não justifica a refatoração agora.
+
+### #9 (grants/RLS) — AUDITADO ao vivo, migration NÃO aplicada (por decisão)
+- Supabase conectado nesta sessão (projeto `cttdibubqgrpkdzhojtn`). Inspeção ao vivo de grants + policies + advisors. **Nada alterado no banco.**
+- **Achado principal:** não há vazamento explorável. Todas as tabelas de negócio (`bets`, `bet_legs`, `bankroll_transactions`, `profiles`) têm RLS + policies `auth.uid() = user_id`, sem `USING (true)`.
+- **Folga (defesa-em-profundidade):** `anon` tem grant amplo (incl. DELETE/TRUNCATE) nas 4 tabelas de negócio — inócuo hoje (RLS bloqueia, `anon` não tem `auth.uid()`), mas privilégio desnecessário. As tabelas telegram já foram endurecidas antes (migration `..._telegram_tables_tighten_grants.sql`); as de negócio não.
+- **Advisors:** `rls_enabled_no_policy` (INFO) em `telegram_pending_bets`/`telegram_settings` — intencional (só service_role); resolver documentando com policy de negação. `auth_leaked_password_protection` (WARN) — config de painel.
+- **Relatório completo:** `SECURITY-AUDIT-2026-07-09.md` (novo, na raiz) com tabelas de grants/policies e recomendações. Todas as ações adiáveis enquanto single-user; quando aplicar, itens 1/2/4 viram uma migration idempotente.
+
+### Estado de commit
+- **Working tree sujo, aguardando commit.** Arquivos: `supabase/functions/telegram-webhook/index.ts`, `SECURITY-AUDIT-2026-07-09.md` (novo), `HANDOFF.md`.
+
 ## ✅ Sessão 2026-07-09 (4) — Fix "Julho De 2026" no calendário + limpeza de dívida técnica (#26, #33 parcial)
 
 ### Fix · Header do Calendário capitalizava a preposição ("Julho **De** 2026")
@@ -224,7 +242,7 @@ Sessão de ajustes diretos (sem agente), iterada com feedback visual do usuário
 4. **[RESOLVIDO 2026-07-09] P-G — Varredura overflow mobile** — todas as telas conferidas: OK, cobertas por StatCard ou overflow-x-auto.
 5. **[RESOLVIDO / N-A 2026-07-09 (4)]** #26 constantes duplicadas → consolidadas em `src/lib/constants.ts`. #33 → não havia `unused-imports`; corrigidos 2× `no-explicit-any` no telegram-webhook (0 erros de eslint). #32/#34/#35 → não-aplicáveis (types.ts em uso; só MOTION-SPEC.md; tema claro já verde). Ver sessão (4).
 6. **[DIFERIDO — reavaliar ao abrir para outros usuários]** #15b apagar conta (exige Edge Function com service role + confirmação forte). Enquanto for single-user, exclusão = SQL direto no Supabase; só vira prioridade quando houver terceiros (obrigação LGPD art. 18).
-7. Bot Telegram: converter testes #8 (401) e #9 (grants) em script curl/SQL; remover `getPendingBet()` morta no webhook.
+7. **[PARCIAL 2026-07-09 (5)]** Bot Telegram: ✅ `getPendingBet()` morta removida. **#8 (teste 401) DIFERIDO** (exigiria refatorar o webhook Deno p/ vitest; comportamento já existe e é trivial). **#9 (grants) AUDITADO** — sem vazamento; folga de grant `anon` nas tabelas de negócio documentada em `SECURITY-AUDIT-2026-07-09.md`; migration de hardening adiada (single-user). Reavaliar #8/#9 ao abrir para outros usuários.
 
 ## 🔧 PENDÊNCIAS NOVAS (2026-07-08, aguardando execução)
 
