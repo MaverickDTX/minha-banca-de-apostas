@@ -8,7 +8,6 @@ import { translateEventName, translateLeague, translateTeamName, translateQueryT
 import { searchEventsBySport, hasApiProduct, shouldTryTheSportsDbFirst } from "@/lib/apisportsMulti";
 import { searchF1Races } from "@/lib/apisportsF1";
 import { searchTennisMatches } from "@/lib/tennis";
-import { searchOddsApiEvents, isOddsApiSport } from "@/lib/oddsApi";
 import { searchMmaEvents } from "@/lib/mma";
 
 export type SportEvent = {
@@ -141,8 +140,14 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     if (tennis.length > 0) return tennis;
   }
 
-  // MMA: busca por promoção via TheSportsDB (eventsnextleague)
-  if (rawLabel === "mma") return searchMmaEvents(q, signal);
+  // MMA: busca multi-fonte (TheSportsDB → Odds API → API-Sports), com fallbacks
+  // interna já tratados pelo searchMmaEvents.
+  let mmaPartial: SportEvent[] = [];
+  if (rawLabel === "mma") {
+    mmaPartial = await searchMmaEvents(q, signal);
+    if (mmaPartial.length >= 2) return mmaPartial; // primário resolveu → retorna cedo
+    // senão cai no fluxo abaixo onde TheSportsDB genérico pode achar lutas extras
+  }
 
   // F1 primária: rotear direto ao adapter Jolpica
   if (label === "automobilismo") {
@@ -164,6 +169,9 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
 
   let hadError = false;
   const results = new Map<string, SportEvent>();
+
+  // Injeta resultados parciais do MMA (quando o early return não disparou)
+  for (const ev of mmaPartial) results.set(ev.id, ev);
 
   if (!matchup) {
     try {
@@ -230,12 +238,12 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     } catch { /* Tênis opcional */ }
   }
 
-  // The Odds API como fonte secundária para MMA (eventos futuros)
-  if (rawLabel === "mma" && isOddsApiSport(rawLabel)) {
+  // MMA como fonte secundária em qualquer esporte (TheSportsDB + Odds API + API-Sports)
+  if (rawLabel !== "mma") {
     try {
-      const odds = await searchOddsApiEvents(q, signal, { includeAll: false });
-      for (const ev of odds) if (!results.has(ev.id)) results.set(ev.id, ev);
-    } catch { /* Odds API opcional */ }
+      const mma = await searchMmaEvents(q, signal);
+      for (const ev of mma) if (!results.has(ev.id)) results.set(ev.id, ev);
+    } catch { /* MMA opcional */ }
   }
 
   let list = Array.from(results.values());

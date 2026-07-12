@@ -64,7 +64,7 @@ export async function searchOddsApiEvents(
   let all = groupCache.get(sportKey);
   if (!all) {
     all = await fetchSport(sportKey, signal);
-    if (all.length > 0) groupCache.set(sportKey, all);
+    groupCache.set(sportKey, all); // cache incluso se vazio — evita re-fetch
   }
 
   if (opts?.includeAll) return all;
