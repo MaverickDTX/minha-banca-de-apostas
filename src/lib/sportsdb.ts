@@ -238,10 +238,12 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     } catch { /* Tênis opcional */ }
   }
 
-  // MMA como fonte secundária em qualquer esporte (TheSportsDB + Odds API + API-Sports)
+  // MMA como fonte secundária em qualquer esporte — só TheSportsDB + Odds API
+  // (cacheados); fighterFallback: false evita busca de lutadores na API-Sports
+  // para queries de outros esportes.
   if (rawLabel !== "mma") {
     try {
-      const mma = await searchMmaEvents(q, signal);
+      const mma = await searchMmaEvents(q, signal, { fighterFallback: false });
       for (const ev of mma) if (!results.has(ev.id)) results.set(ev.id, ev);
     } catch { /* MMA opcional */ }
   }

@@ -196,7 +196,11 @@ function dedupeAndSort(list: SportEvent[], max?: number): SportEvent[] {
   return max ? deduped.slice(0, max) : deduped;
 }
 
-export async function searchMmaEvents(query: string, signal?: AbortSignal, opts?: { includeAll?: boolean }): Promise<SportEvent[]> {
+export async function searchMmaEvents(
+  query: string,
+  signal?: AbortSignal,
+  opts?: { includeAll?: boolean; fighterFallback?: boolean },
+): Promise<SportEvent[]> {
   const q = normText(query);
 
   // 1. TheSportsDB (promoções)
@@ -217,8 +221,11 @@ export async function searchMmaEvents(query: string, signal?: AbortSignal, opts?
 
   let filtered = merged.slice(0, 40).filter((ev) => hayFn(ev).includes(q));
 
-  // 3. Fallback: API-Sports MMA (só se TSDB+Odds não acharam nada relevante)
-  if (filtered.length === 0) {
+  // 3. Fallback: API-Sports MMA (busca por lutador). Só roda quando o MMA é o
+  // esporte selecionado (fighterFallback !== false) — como fonte secundária de
+  // outros esportes, toda query de futebol cairia aqui e dispararia
+  // /fighters?search=<time> à toa.
+  if (filtered.length === 0 && opts?.fighterFallback !== false) {
     try {
       const apisports = await loadApisportsMma(query, signal);
       filtered = dedupeAndSort(apisports, 20);
