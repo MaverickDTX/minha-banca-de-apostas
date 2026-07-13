@@ -73,9 +73,27 @@ function splitMatchup(q: string): [string, string] | null {
   return null;
 }
 
-function matchesOpponent(ev: SportEvent, variants: string[]): boolean {
+/**
+ * Casa um lado do confronto por frase inteira OU por tokens (≥3 chars).
+ * "BK Hacken" precisa casar com "Halmstad vs Häcken" (TSDB não usa o "BK"):
+ * a frase inteira falha, mas o token "hacken" casa. Exigir TODOS os tokens
+ * evita falso-positivo ("Real Madrid" não casa com "Real Sociedad").
+ */
+function matchesTeam(ev: SportEvent, variants: string[]): boolean {
   const hay = normText([ev.name, ev.homeTeam ?? "", ev.awayTeam ?? ""].join(" "));
-  return variants.some((v) => hay.includes(normText(v)));
+  return variants.some((v) => {
+    const nv = normText(v);
+    if (hay.includes(nv)) return true;
+    const tokens = nv.split(/\s+/).filter((t) => t.length >= 3);
+    return tokens.length > 0 && tokens.every((t) => hay.includes(t));
+  });
+}
+
+/** Token mais longo (≥4 chars) de um nome de time; null se não houver. */
+function longestToken(name: string): string | null {
+  const tokens = name.split(/\s+/).filter((t) => t.length >= 4);
+  if (tokens.length === 0) return null;
+  return tokens.reduce((a, b) => (b.length > a.length ? b : a));
 }
 
 /** Map TheSportsDB/API-Sports sport string to the in-app sport label (PT-BR). */
@@ -120,6 +138,49 @@ export function mapSportLabel(strSport: string): string {
 }
 
 /**
+ * Agenda de um time no TheSportsDB: searchteams (1º resultado — a key
+ * gratuita devolve só 1) + eventsnext + eventslast.
+ * ATENÇÃO: na key gratuita, eventsnext devolve APENAS 1 evento.
+ */
+async function fetchTeamSchedule(
+  teamQuery: string,
+  signal?: AbortSignal,
+): Promise<{ events: SportEvent[]; hadError: boolean }> {
+  const events: SportEvent[] = [];
+  let hadError = false;
+  try {
+    const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(teamQuery)}`, { signal });
+    if (res.ok) {
+      const json = await res.json();
+      const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 1) : [];
+      const [nexts, lasts] = await Promise.all([
+        Promise.all(
+          teams.map((t) =>
+            fetch(`${BASE}/eventsnext.php?id=${t.idTeam}`, { signal })
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ),
+        ),
+        Promise.all(
+          teams.map((t) =>
+            fetch(`${BASE}/eventslast.php?id=${t.idTeam}`, { signal })
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ),
+        ),
+      ]);
+      for (const j of [...nexts, ...lasts]) {
+        const arr: RawEvent[] = Array.isArray(j?.events) ? j.events : Array.isArray(j?.results) ? j.results : [];
+        for (const raw of arr) events.push(normalize(raw));
+      }
+    } else {
+      hadError = true;
+    }
+  } catch { hadError = true; }
+  return { events, hadError };
+}
+
+/**
  * Search upcoming/recent events by event name OR team name.
  * Combines `searchevents` (event-name match) with `searchteams` + `eventsnext`
  * to also surface games when the user types just a team/country.
@@ -154,11 +215,16 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     return searchEventsBySport(q, signal, label);
   }
 
-  // "Time A x Time B": busca pelo time A e filtra os resultados pelo time B.
+  // "Time A x Time B": busca a agenda dos DOIS lados e filtra exigindo ambos.
+  // Buscar só o lado A não basta: na key gratuita o eventsnext devolve 1 único
+  // evento, então o confronto pode aparecer apenas na agenda do lado B.
   const matchup = splitMatchup(q);
   const teamPart = matchup ? matchup[0] : q;
 
   const searchQ = translateQueryToEnglish(teamPart) ?? teamPart;
+  const sideAVariants = matchup
+    ? [matchup[0], translateQueryToEnglish(matchup[0]) ?? ""].filter(Boolean)
+    : null;
   const opponentVariants = matchup
     ? [matchup[1], translateQueryToEnglish(matchup[1]) ?? ""].filter(Boolean)
     : null;
@@ -189,38 +255,14 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     } catch { hadError = true; }
   }
 
-  try {
-    const res = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(searchQ)}`, { signal });
-    if (res.ok) {
-      const json = await res.json();
-      const teams: { idTeam: string }[] = Array.isArray(json?.teams) ? json.teams.slice(0, 1) : [];
-      const [nexts, lasts] = await Promise.all([
-        Promise.all(
-          teams.map((t) =>
-            fetch(`${BASE}/eventsnext.php?id=${t.idTeam}`, { signal })
-              .then((r) => (r.ok ? r.json() : null))
-              .catch(() => null),
-          ),
-        ),
-        Promise.all(
-          teams.map((t) =>
-            fetch(`${BASE}/eventslast.php?id=${t.idTeam}`, { signal })
-              .then((r) => (r.ok ? r.json() : null))
-              .catch(() => null),
-          ),
-        ),
-      ]);
-      for (const j of [...nexts, ...lasts]) {
-        const arr: RawEvent[] = Array.isArray(j?.events) ? j.events : Array.isArray(j?.results) ? j.results : [];
-        for (const raw of arr) {
-          const ev = normalize(raw);
-          if (!results.has(ev.id)) results.set(ev.id, ev);
-        }
-      }
-    } else {
-      hadError = true;
-    }
-  } catch { hadError = true; }
+  // Agenda por time: lado A sempre; lado B também quando a query é "A x B".
+  const teamQueries = [searchQ];
+  if (matchup) teamQueries.push(translateQueryToEnglish(matchup[1]) ?? matchup[1]);
+  const schedules = await Promise.all(teamQueries.map((t) => fetchTeamSchedule(t, signal)));
+  for (const s of schedules) {
+    if (s.hadError) hadError = true;
+    for (const ev of s.events) if (!results.has(ev.id)) results.set(ev.id, ev);
+  }
 
   // F1 como fonte secundária em qualquer esporte (1 request cacheado, filtro client-side)
   if (label !== "automobilismo") {
@@ -248,25 +290,48 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     } catch { /* MMA opcional */ }
   }
 
-  let list = Array.from(results.values());
-  if (opponentVariants) list = list.filter((ev) => matchesOpponent(ev, opponentVariants));
-  list = list
-    .sort((a, b) => {
-      const at = a.date ? Date.parse(a.date) : Infinity;
-      const bt = b.date ? Date.parse(b.date) : Infinity;
-      const now = Date.now();
-      const af = at >= now ? 0 : 1;
-      const bf = bt >= now ? 0 : 1;
-      if (af !== bf) return af - bf;
-      return Math.abs(at - now) - Math.abs(bt - now);
-    })
-    .slice(0, 15);
+  const filterAndSort = () => {
+    let l = Array.from(results.values());
+    // Como agora há eventos das agendas dos dois times, o filtro exige que o
+    // evento contenha AMBOS os lados (para a agenda de A, o lado A é trivial).
+    if (sideAVariants && opponentVariants) {
+      l = l.filter((ev) => matchesTeam(ev, sideAVariants) && matchesTeam(ev, opponentVariants));
+    }
+    return l
+      .sort((a, b) => {
+        const at = a.date ? Date.parse(a.date) : Infinity;
+        const bt = b.date ? Date.parse(b.date) : Infinity;
+        const now = Date.now();
+        const af = at >= now ? 0 : 1;
+        const bf = bt >= now ? 0 : 1;
+        if (af !== bf) return af - bf;
+        return Math.abs(at - now) - Math.abs(bt - now);
+      })
+      .slice(0, 15);
+  };
+  let list = filterAndSort();
+
+  // Retry por token: "BK Hacken" no searchteams acha só o time feminino
+  // (key gratuita = 1 resultado), mas "Hacken" acha o masculino. Se o filtro
+  // zerou, refaz a busca de agenda com o token mais longo de cada lado.
+  if (list.length === 0 && matchup) {
+    const tokenQueries = teamQueries
+      .map((t) => longestToken(t))
+      .filter((t): t is string => !!t && !teamQueries.some((tq) => normText(tq) === normText(t)));
+    if (tokenQueries.length > 0) {
+      const more = await Promise.all(tokenQueries.map((t) => fetchTeamSchedule(t, signal)));
+      for (const s of more) {
+        for (const ev of s.events) if (!results.has(ev.id)) results.set(ev.id, ev);
+      }
+      list = filterAndSort();
+    }
+  }
 
   // Fallback: TheSportsDB vazio → tenta API-Sports (só para esportes sem TSDB)
   if (list.length === 0 && hasApiProduct(label) && !shouldTryTheSportsDbFirst(label)) {
     try {
       let fallback = await searchEventsBySport(q, signal, label);
-      if (opponentVariants) fallback = fallback.filter((ev) => matchesOpponent(ev, opponentVariants));
+      if (opponentVariants) fallback = fallback.filter((ev) => matchesTeam(ev, opponentVariants));
       list = fallback.slice(0, 15);
     } catch { hadError = true; }
   }

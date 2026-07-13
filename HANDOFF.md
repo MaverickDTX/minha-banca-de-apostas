@@ -1,6 +1,6 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Última atualização: 2026-07-11
+Última atualização: 2026-07-13
 
 Planilha web para controle de apostas esportivas: registro de apostas, gestão de
 banca e análise de desempenho (ROI, yield, taxa de acerto, drawdown, CLV, EV, Kelly).
@@ -11,7 +11,8 @@ banca e análise de desempenho (ROI, yield, taxa de acerto, drawdown, CLV, EV, K
 - Working tree limpo.
 - Verificação canônica da última sessão: `tsc --noEmit` 0 erros, `vite build` OK.
 - Autocomplete MMA: agora busca em cascata **TheSportsDB → Odds API → API-Sports MMA** quando o primário falha. Todos os caches armazenam resultados vazios (evita re-fetch infinito).
-- MMA como fonte secundária universal: aparece nos resultados independente do esporte selecionado (como F1 e Tênis já faziam).
+- MMA como fonte secundária universal: aparece nos resultados independente do esporte selecionado (como F1 e Tênis já faziam). **Fix 2026-07-13:** a fonte secundária agora passa `fighterFallback: false` — só usa os caches TSDB+Odds. Antes, qualquer query de outro esporte que não coincidisse com luta caía no terciário e disparava `/fighters?search=<time de futebol>` na API-Sports (quota + latência à toa).
+- **Fix 2026-07-13 (busca "A x B"):** a key gratuita do TheSportsDB trunca `eventsnext.php` a **1 evento** (verificado ao vivo), então buscar só a agenda do lado A perdia confrontos (caso real: "Halmstad x BK Hacken" — o next do Halmstad ainda era o jogo de hoje já encerrado; o confronto só aparecia no next do Häcken). Agora: (1) busca a agenda dos dois lados; (2) filtro exige ambos os lados, casando por tokens ≥3 chars ("BK Hacken" casa com "Halmstad vs Häcken" via token "hacken"; frase inteira falhava); (3) retry com o token mais longo quando o filtro zera (`searchteams.php?t=BK Hacken` devolve só o time feminino; `t=Hacken` acha o masculino).
 
 ## Backlog vivo
 
