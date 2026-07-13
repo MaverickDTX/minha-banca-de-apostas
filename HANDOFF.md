@@ -7,9 +7,10 @@ banca e análise de desempenho (ROI, yield, taxa de acerto, drawdown, CLV, EV, K
 
 ## Estado atual
 
-- `origin/main` HEAD: `c9202e5` (fix(mma): busca multi-fonte com fallbacks + cache vazio + fonte secundária universal).
-- Working tree limpo.
-- Verificação canônica da última sessão: `tsc --noEmit` 0 erros, `vite build` OK.
+- `origin/main`: `c9202e5`. Local `main` à frente por 3 commits (docs handoff +
+  fix MMA fighterFallback + fix busca "A x B"). **Push pendente pelo Windows**
+  (sandbox sem credencial git).
+- Verificação da sessão 2026-07-13: `tsc --noEmit` 0 erros, `vitest` 119/119 OK.
 - Autocomplete MMA: agora busca em cascata **TheSportsDB → Odds API → API-Sports MMA** quando o primário falha. Todos os caches armazenam resultados vazios (evita re-fetch infinito).
 - MMA como fonte secundária universal: aparece nos resultados independente do esporte selecionado (como F1 e Tênis já faziam). **Fix 2026-07-13:** a fonte secundária agora passa `fighterFallback: false` — só usa os caches TSDB+Odds. Antes, qualquer query de outro esporte que não coincidisse com luta caía no terciário e disparava `/fighters?search=<time de futebol>` na API-Sports (quota + latência à toa).
 - **Fix 2026-07-13 (busca "A x B"):** a key gratuita do TheSportsDB trunca `eventsnext.php` a **1 evento** (verificado ao vivo), então buscar só a agenda do lado A perdia confrontos (caso real: "Halmstad x BK Hacken" — o next do Halmstad ainda era o jogo de hoje já encerrado; o confronto só aparecia no next do Häcken). Agora: (1) busca a agenda dos dois lados; (2) filtro exige ambos os lados, casando por tokens ≥3 chars ("BK Hacken" casa com "Halmstad vs Häcken" via token "hacken"; frase inteira falhava); (3) retry com o token mais longo quando o filtro zera (`searchteams.php?t=BK Hacken` devolve só o time feminino; `t=Hacken` acha o masculino).
@@ -70,6 +71,9 @@ contraditórios, locks órfãos irremovíveis (`Operation not permitted`).
    **commitar/pushar pelo Windows**.
 5. Processos em background NÃO sobrevivem entre chamadas de bash — verificação
    sempre síncrona.
+6. Se um arquivo aparecer truncado na montagem mas íntegro via Read (host),
+   regravar o conteúdo por heredoc (`cat > arquivo << 'EOF'`) por dentro do VM:
+   o write-through refresca o cache e o disco recebe o mesmo conteúdo.
 
 ## Stack & infra
 
@@ -109,6 +113,10 @@ peça ao usuário em vez de gastar tokens contornando o bug do FUSE.
 Histórico de sessões (todas verificadas com `tsc`/`eslint`/`vitest` e commitadas,
 salvo indicação). Detalhe fino disponível no git log.
 
+- **2026-07-13** — Autocomplete: (1) MMA secundário sem busca de lutador
+  (`fighterFallback: false`); (2) busca "A x B" consulta agenda dos dois times,
+  match por token ≥3 chars e retry com token mais longo (caso Halmstad x BK
+  Hacken; key gratuita TSDB trunca eventsnext a 1 evento). `mma.ts`, `sportsdb.ts`.
 - **2026-07-11** — Autocomplete MMA reescrito: `searchMmaEvents` tenta TheSportsDB → Odds API → API-Sports MMA em cascata em vez de depender só da TheSportsDB. Cache de MMA e Odds API passam a armazenar resultados vazios (elimina re-fetch infinito). MMA vira fonte secundária universal (aparece em qualquer esporte, como F1/Tênis). Sport auto-switch no `onPick` já existia. `mma.ts`, `sportsdb.ts`, `oddsApi.ts`.
 - **2026-07-10** — Favicon: `favicon.ico` ainda continha o ícone antigo (só o
   `.svg` fora trocado); regenerado a partir do SVG (cifrão verde, 6 tamanhos
