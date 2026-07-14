@@ -92,6 +92,9 @@ async function loadWindow(): Promise<IndexedEvent[]> {
       ...wta.items.map((f) => toEvent(f, "WTA")),
     ].filter((e) => e._hay.length > 1);
 
+    // Debug: log da quantidade de eventos carregados
+    console.log(`[Tennis] Loaded ${events.length} events (ATP: ${atp.items.length}, WTA: ${wta.items.length})`);
+
     // Só cacheia carga completa: evita fixar resultado parcial (ex.: página 1 após 429),
     // que deixaria jogadores de páginas seguintes sumidos pelo resto da sessão.
     if (events.length > 0 && atp.complete && wta.complete) fixturesCache.set(key, events);
@@ -120,8 +123,17 @@ export async function searchTennisMatches(query: string, signal?: AbortSignal): 
   // Verifica novamente após a carga (não foi cancelado enquanto esperava)
   if (signal?.aborted) return [];
   
-  return fixtures
-    .filter((f) => f._hay.includes(q))
+  console.log(`[Tennis] Searching "${query}" (normalized: "${q}") in ${fixtures.length} fixtures`);
+  
+  const filtered = fixtures
+    .filter((f) => f._hay.includes(q));
+  
+  console.log(`[Tennis] Found ${filtered.length} matches`);
+  if (filtered.length > 0) {
+    console.log(`[Tennis] Top 3 results:`, filtered.slice(0, 3).map(f => ({ name: f.name, hay: f._hay })));
+  }
+  
+  return filtered
     .sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
     .slice(0, 15)
     .map(({ _hay, ...ev }) => ev);
