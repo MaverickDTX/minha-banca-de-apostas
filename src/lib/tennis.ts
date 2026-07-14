@@ -106,13 +106,20 @@ async function loadWindow(): Promise<IndexedEvent[]> {
   }
 }
 
-// signal ignorado de propósito: a janela é carga compartilhada/cacheada e não deve
-// ser cancelada por um keystroke. O componente descarta resultados obsoletos via
-// ctrl.signal.aborted antes de renderizar.
-export async function searchTennisMatches(query: string, _signal?: AbortSignal): Promise<SportEvent[]> {
+// Respeita AbortSignal: evita retornar resultados obsoletos quando o usuário
+// cancela a busca (ex.: ao editar aposta e mudar de esporte).
+export async function searchTennisMatches(query: string, signal?: AbortSignal): Promise<SportEvent[]> {
   const q = normText(query);
   if (q.length < 3) return [];
+  
+  // Se já foi abortado, retorna vazio imediatamente
+  if (signal?.aborted) return [];
+  
   const fixtures = await loadWindow();
+  
+  // Verifica novamente após a carga (não foi cancelado enquanto esperava)
+  if (signal?.aborted) return [];
+  
   return fixtures
     .filter((f) => f._hay.includes(q))
     .sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
