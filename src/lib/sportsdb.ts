@@ -7,7 +7,7 @@ const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 import { translateEventName, translateLeague, translateTeamName, translateQueryToEnglish } from "@/lib/translate";
 import { searchEventsBySport, hasApiProduct, shouldTryTheSportsDbFirst } from "@/lib/apisportsMulti";
 import { searchF1Races } from "@/lib/apisportsF1";
-import { searchTennisMatches } from "@/lib/tennis";
+import { searchTennisMatches, tennisQuotaLimited } from "@/lib/tennis";
 import { searchMmaEvents } from "@/lib/mma";
 
 export type SportEvent = {
@@ -197,7 +197,9 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
 
   // Tênis: Matchstat via proxy (edge function tennis-fixtures); fallback TheSportsDB (cobertura fraca)
   if (rawLabel === "tênis") {
-    const tennis = await searchTennisMatches(q, signal);
+    tennisQuotaLimited.value = false;
+    // allowFlashscore: busca primária de tênis pode acionar o fallback (cota Flashscore).
+    const tennis = await searchTennisMatches(q, signal, { allowFlashscore: true });
     if (tennis.length > 0) return tennis;
   }
 
@@ -332,7 +334,6 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     try {
       let fallback = await searchEventsBySport(q, signal, label);
       if (opponentVariants) fallback = fallback.filter((ev) => matchesTeam(ev, opponentVariants));
-      list = fallback.slice(0, 15);
     } catch { hadError = true; }
   }
 

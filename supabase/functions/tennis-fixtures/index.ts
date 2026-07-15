@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const HOST = "tennis-api-atp-wta-itf.p.rapidapi.com";
+const FS_HOST = "flashscore4.p.rapidapi.com";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -41,24 +42,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, status: 405, body: null, error: "method not allowed" }, 405);
 
-  let params: { type?: string; start?: string; end?: string; pageNo?: number; pageSize?: number };
+  let params: {
+    type?: string; start?: string; end?: string; pageNo?: number; pageSize?: number;
+    provider?: string; path?: string;
+  };
   try {
     params = await req.json();
   } catch {
     return json({ ok: false, status: 400, body: null, error: "invalid json body" }, 400);
-  }
-
-  const { type, start, end } = params;
-  const pageNo = Number(params.pageNo ?? 1);
-  const pageSize = Number(params.pageSize ?? 100);
-  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-  if (
-    (type !== "atp" && type !== "wta") ||
-    !dateRe.test(start ?? "") || !dateRe.test(end ?? "") ||
-    !Number.isInteger(pageNo) || pageNo < 1 ||
-    !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100
-  ) {
-    return json({ ok: false, status: 400, body: null, error: "bad params" }, 400);
   }
 
   let key: string;
@@ -66,6 +57,40 @@ Deno.serve(async (req) => {
     key = await rapidKey();
   } catch (e) {
     return json({ ok: false, status: 500, body: null, error: String(e) }, 500);
+  }
+
+  // ---- Modo Flashscore: chamada genérica de caminho (search / results / fixtures)
+  // Reusa a mesma X-RapidAPI-Key do Vault. Encadeamento search→results é feito
+  // no cliente (tennis.ts); aqui só repassamos o path com a chave e o host certo.
+  if (params.provider === "flashscore" && typeof params.path === "string" && params.path.length > 0) {
+    if (!params.path.startsWith("/")) {
+      return json({ ok: false, status: 400, body: null, error: "bad params" }, 400);
+    }
+    const url = `https://${FS_HOST}${params.path}`;
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { headers: { "X-RapidAPI-Key": key, "X-RapidAPI-Host": FS_HOST } });
+    } catch (e) {
+      return json({ ok: false, status: 502, body: null, error: `upstream fetch: ${String(e)}` }, 200);
+    }
+    const text = await upstream.text();
+    let body: unknown;
+    try { body = JSON.parse(text); } catch { body = text; }
+    return json({ ok: upstream.ok, status: upstream.status, body }, 200);
+  }
+
+  // ---- Modo Matchstat (primário): fixtures por tour/janela.
+  const { type, start, end } = params;
+  const pageNo = Number(params.pageNo ?? 1);
+  const pageSize = Number(params.pageSize ?? 100);
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (
+    (type !== "atp" && type !== "wta" && type !== "itf") ||
+    !dateRe.test(start ?? "") || !dateRe.test(end ?? "") ||
+    !Number.isInteger(pageNo) || pageNo < 1 ||
+    !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100
+  ) {
+    return json({ ok: false, status: 400, body: null, error: "bad params" }, 400);
   }
 
   const url = `https://${HOST}/tennis/v2/${type}/fixtures/${start}/${end}?pageSize=${pageSize}&pageNo=${pageNo}`;
