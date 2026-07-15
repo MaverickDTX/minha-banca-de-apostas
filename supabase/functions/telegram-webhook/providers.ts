@@ -3,6 +3,9 @@ import { z } from "npm:zod";
 const BetExtractedSchema = z.object({
   event_name: z.string().nullable().optional(),
   event_date: z.string().nullable().optional(),
+  // Campo auxiliar da extração. Não é persistido: permite corrigir de forma
+  // determinística uma data cujo ano não aparece no bilhete.
+  event_date_year_visible: z.boolean(),
   bet_date: z.string().nullable().optional(),
   market: z.string().nullable().optional(),
   selection: z.string().nullable().optional(),
@@ -31,6 +34,7 @@ const RESPONSE_SCHEMA = {
   properties: {
     event_name: { type: "string", nullable: true },
     event_date: { type: "string", nullable: true },
+    event_date_year_visible: { type: "boolean" },
     bet_date: { type: "string", nullable: true },
     market: { type: "string", nullable: true },
     selection: { type: "string", nullable: true },
@@ -39,14 +43,19 @@ const RESPONSE_SCHEMA = {
     bookmaker: { type: "string", nullable: true },
     status: { type: "string", enum: ["pendente", "green", "red", "void"] },
   },
-  required: ["odds", "stake_amount", "status"],
+  required: ["odds", "stake_amount", "status", "event_date_year_visible"],
 };
 
+function dateInstruction(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `datas em ISO 8601; hoje é ${today}; event_date é a data do jogo. Informe event_date_year_visible como true somente se o ano estiver explícito no bilhete/descrição. Se o ano não estiver visível, informe false e use a próxima ocorrência futura da data a partir de hoje — nunca assuma 2025 sem que 2025 esteja explícito. bet_date só se o bilhete/descritivo mostrar quando a aposta foi feita.`;
+}
+
 const EXTRACTION_PROMPT =
-  "Extraia os dados deste bilhete de aposta. Regras: use null para qualquer campo NÃO VISÍVEL na imagem (não infira — em especial a casa de apostas: se o nome não estiver escrito, é null); valores monetários como número puro; datas em ISO 8601; event_date é a data do jogo mostrada no bilhete — se o ano não estiver visível, assuma a próxima ocorrência futura da data; bet_date só se o bilhete mostrar quando a aposta foi feita.";
+  "Extraia os dados deste bilhete de aposta. Regras: use null para qualquer campo NÃO VISÍVEL na imagem (não infira — em especial a casa de apostas: se o nome não estiver escrito, é null); valores monetários como número puro; ";
 
 const TEXT_EXTRACTION_PROMPT =
-  "Extraia os dados desta descrição de aposta. Regras: use null para qualquer campo NÃO INFORMADO (não infira — em especial a casa de apostas: se o nome não for dito, é null); valores monetários como número puro; datas em ISO 8601; event_date é a data do jogo — se o ano não estiver visível, assuma a próxima ocorrência futura da data; bet_date só se a descrição mencionar quando a aposta foi feita.";
+  "Extraia os dados desta descrição de aposta. Regras: use null para qualquer campo NÃO INFORMADO (não infira — em especial a casa de apostas: se o nome não for dito, é null); valores monetários como número puro; ";
 
 function buildPrompt(userText?: string, caption?: string, currentPayload?: string, correctionText?: string): string {
   let prompt: string;
@@ -55,11 +64,11 @@ function buildPrompt(userText?: string, caption?: string, currentPayload?: strin
     prompt =
       `Aqui está a extração atual de um bilhete de aposta:\n${currentPayload}\n\n` +
       `O usuário enviou as seguintes correções:\n${correctionText}\n\n` +
-      `Atualize o JSON extraído com as correções do usuário. As correções do usuário VENCEM os valores anteriores. Mantenha campos não mencionados.`;
+      `Atualize o JSON extraído com as correções do usuário. As correções do usuário VENCEM os valores anteriores. Mantenha campos não mencionados. ${dateInstruction()}`;
   } else if (userText) {
-    prompt = TEXT_EXTRACTION_PROMPT + `\n\nDescrição: ${userText}`;
+    prompt = TEXT_EXTRACTION_PROMPT + dateInstruction() + `\n\nDescrição: ${userText}`;
   } else {
-    prompt = EXTRACTION_PROMPT;
+    prompt = EXTRACTION_PROMPT + dateInstruction();
   }
 
   if (caption) {
@@ -210,7 +219,26 @@ async function callZen(
   }
 }
 
-function validateAndNormalize(rawJson: string): BetInput | null {
+export function resolveDateWithoutVisibleYear(eventDate: string, now = new Date()): string {
+  const parsed = new Date(eventDate);
+  if (Number.isNaN(parsed.getTime())) return eventDate;
+
+  const makeCandidate = (year: number) => new Date(Date.UTC(
+    year,
+    parsed.getUTCMonth(),
+    parsed.getUTCDate(),
+    parsed.getUTCHours(),
+    parsed.getUTCMinutes(),
+    parsed.getUTCSeconds(),
+    parsed.getUTCMilliseconds(),
+  ));
+
+  let candidate = makeCandidate(now.getUTCFullYear());
+  if (candidate.getTime() < now.getTime()) candidate = makeCandidate(now.getUTCFullYear() + 1);
+  return candidate.toISOString();
+}
+
+export function validateAndNormalize(rawJson: string): BetInput | null {
   try {
     const parsed = JSON.parse(rawJson);
     const result = BetExtractedSchema.safeParse(parsed);
@@ -219,14 +247,17 @@ function validateAndNormalize(rawJson: string): BetInput | null {
       return null;
     }
     const data = result.data;
-    const betDate = data.bet_date ?? data.event_date ?? new Date().toISOString();
+    const eventDate = data.event_date_year_visible === false && data.event_date
+      ? resolveDateWithoutVisibleYear(data.event_date)
+      : data.event_date ?? null;
+    const betDate = data.bet_date ?? new Date().toISOString();
     return {
       odds: data.odds,
       stake_amount: data.stake_amount,
       status: data.status ?? "pendente",
       bet_date: betDate,
       event_name: data.event_name ?? null,
-      event_date: data.event_date ?? null,
+      event_date: eventDate,
       market: data.market ?? null,
       selection: data.selection ?? null,
       bookmaker: data.bookmaker ?? null,
