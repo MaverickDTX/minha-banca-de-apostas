@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { searchEvents, mapSportLabel, type SportEvent } from "@/lib/sportsdb";
-import { tennisQuotaLimited } from "@/lib/tennis";
 import { Loader2, CalendarDays } from "lucide-react";
 
 type Pick = {
@@ -30,7 +29,6 @@ export function EventAutocomplete({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SportEvent[]>([]);
-  const [quotaLimited, setQuotaLimited] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const skipQueryRef = useRef<string | null>(value || null);
 
@@ -42,7 +40,7 @@ export function EventAutocomplete({
     }
     // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
     // útil e cada disparo custa até 6 requests somando as duas APIs.
-    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); setQuotaLimited(false); return; }
+    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); return; }
     const handle = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
@@ -52,7 +50,6 @@ export function EventAutocomplete({
         const list = await searchEvents(q, ctrl.signal, sport);
         if (!ctrl.signal.aborted) {
           setResults(list);
-          setQuotaLimited(tennisQuotaLimited.value);
           setOpen(true);
         }
       } finally {
@@ -101,9 +98,7 @@ export function EventAutocomplete({
       >
         {results.length === 0 ? (
           <div className="p-3 text-xs text-muted-foreground">
-            {quotaLimited
-              ? "Busca de tênis temporariamente limitada pela fonte (cota diária). Tente mais tarde."
-              : "Nenhum evento encontrado."}
+            Nenhum evento encontrado.
           </div>
         ) : (
           <ul className="py-1">

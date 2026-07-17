@@ -1,24 +1,57 @@
 # Handoff — Bankroll Pro (minha-banca-de-apostas)
 
-Última atualização: 2026-07-13
+Última atualização: 2026-07-17
 
 Planilha web para controle de apostas esportivas: registro de apostas, gestão de
 banca e análise de desempenho (ROI, yield, taxa de acerto, drawdown, CLV, EV, Kelly).
 
 ## Estado atual
 
-- `origin/main`: `c9202e5`. Local `main` à frente por 3 commits (docs handoff +
-  fix MMA fighterFallback + fix busca "A x B"). **Push pendente pelo Windows**
-  (sandbox sem credencial git).
-- Verificação da sessão 2026-07-13: `tsc --noEmit` 0 erros, `vitest` 119/119 OK.
+- `origin/main`: `2737750` (feat tênis fallback Flashscore + breaker). O estado
+  "c9202e5 + 3 commits locais" registrado em 2026-07-13 já foi pushado.
+- Verificação da sessão 2026-07-17: `vitest` 151/151 OK; `vite build` OK.
+  **`tsc --noEmit` NÃO está limpo** — 8 erros pré-existentes em
+  `useTelegramLink.ts` (tipos gerados do Supabase sem a tabela `telegram_links`;
+  ver backlog #T2). Zero erros nos módulos de tênis/autocomplete.
+- **Fix 2026-07-17 (autocomplete tênis — regressão do `2737750`):** o refactor de
+  `loadWindow` para `{ events, quotaLimited }` não atualizou cache/inflight, que
+  seguiam tipados como `IndexedEvent[]`. 1ª busca funcionava (cache frio); da 2ª
+  em diante o cache hit devolvia array onde se esperava objeto → `TypeError`
+  engolido → autocomplete morto ao adicionar/editar. O `vite build` não roda
+  `tsc` (esbuild só transpila), então o erro — apontado pelo `tsc` — chegou a
+  produção. Corrigido: tipos consistentes (`WindowResult`), teste de regressão
+  do cache adicionado.
+- **Fix 2026-07-17 (cota Matchstat):** (1) retry em 429 removido — na RapidAPI
+  cada 429 debita da cota, o retry triplicava o gasto; (2) breaker consultado
+  por página (`loadTour`) e por tour (`loadWindow`), não só no início da busca —
+  antes um 429 no ATP ainda deixava WTA/ITF/upcoming queimarem até 17 requests.
+  Contrato em teste: exatamente 1 chamada ao primário antes do fallback.
+- **Fix 2026-07-17 (fallback Flashscore intermitente):** fallback disparava só
+  com 429 sinalizado no envelope; timeout da edge function (frequente com a
+  cascata antiga de 18+ requests em série) deixava `quotaLimited=false` e
+  nenhuma fonte respondia. Agora dispara em QUALQUER carga incompleta (429,
+  timeout, 5xx). Candidatos do search Flashscore: 5 → 3 (2 req/candidato contra
+  cota de 500/mês).
+- **UX 2026-07-17 (decisão do usuário):** aviso "cota temporariamente limitada"
+  removido da UI — popover vazio mostra sempre "Nenhum evento encontrado."
+  `tennisQuotaLimited` (estado global mutável) eliminado de
+  `tennis.ts`/`sportsdb.ts`/`EventAutocomplete.tsx`.
 - Autocomplete MMA: agora busca em cascata **TheSportsDB → Odds API → API-Sports MMA** quando o primário falha. Todos os caches armazenam resultados vazios (evita re-fetch infinito).
 - MMA como fonte secundária universal: aparece nos resultados independente do esporte selecionado (como F1 e Tênis já faziam). **Fix 2026-07-13:** a fonte secundária agora passa `fighterFallback: false` — só usa os caches TSDB+Odds. Antes, qualquer query de outro esporte que não coincidisse com luta caía no terciário e disparava `/fighters?search=<time de futebol>` na API-Sports (quota + latência à toa).
 - **Fix 2026-07-13 (busca "A x B"):** a key gratuita do TheSportsDB trunca `eventsnext.php` a **1 evento** (verificado ao vivo), então buscar só a agenda do lado A perdia confrontos (caso real: "Halmstad x BK Hacken" — o next do Halmstad ainda era o jogo de hoje já encerrado; o confronto só aparecia no next do Häcken). Agora: (1) busca a agenda dos dois lados; (2) filtro exige ambos os lados, casando por tokens ≥3 chars ("BK Hacken" casa com "Halmstad vs Häcken" via token "hacken"; frase inteira falhava); (3) retry com o token mais longo quando o filtro zera (`searchteams.php?t=BK Hacken` devolve só o time feminino; `t=Hacken` acha o masculino).
 
 ## Backlog vivo
 
-Não há tarefa de código pendente confirmada. Os itens abaixo são bloqueios de
-plano ou decisões conscientes de adiamento — nenhum é bug em aberto.
+**Tarefas de código pendentes (sessão 2026-07-17):**
+
+- **#T1 — `tsc` no build** — o script `build` é só `vite build` (esbuild apaga
+  tipos SEM checar; `lint` também não pega erro de tipo). Foi assim que a
+  regressão do `2737750` chegou a produção. Trocar para
+  `tsc --noEmit -p tsconfig.app.json && vite build`. **Bloqueado por #T2** (o
+  build passaria a falhar nos 8 erros pré-existentes).
+- **#T2 — regenerar tipos do Supabase** — `src/integrations/supabase/types.ts`
+  não inclui `telegram_links` → 8 erros em `useTelegramLink.ts`. Rodar
+  `supabase gen types typescript` e commitar. Pré-requisito de #T1.
 
 1. **Leaked Password Protection (Supabase)** — BLOQUEADO POR PLANO. Advisor
    `auth_leaked_password_protection` (WARN) fica aberto. O toggle é feature Pro
@@ -37,6 +70,13 @@ plano ou decisões conscientes de adiamento — nenhum é bug em aberto.
 
 ### Ideias registradas (sem compromisso)
 
+- **#B — busca por jogador no Matchstat**: mesmo corrigida, a arquitetura do
+  tênis gasta até 9 requests por janela fria (3 tours × 3 páginas de fixtures,
+  filtro client-side) — até 18 numa busca que consulta recent + upcoming. Se a
+  doc (`tennisapidoc.matchstat.com`) expuser endpoint de busca/fixtures por
+  jogador, trocar a paginação de janelas por busca direta reduziria a 1–2
+  requests por query e tornaria o 429 raro em vez de rotineiro. Conferir a doc
+  antes de qualquer refactor.
 - **#A — expansão multi-esporte**: rotear o fallback API-Sports pelo esporte
   selecionado. Decidir antes: `VITE_API_SPORTS_KEY` vai ao bundle (visitante pode
   extrair e queimar a cota); se o app deixar de ser pessoal, mover para uma Edge
@@ -113,6 +153,17 @@ peça ao usuário em vez de gastar tokens contornando o bug do FUSE.
 Histórico de sessões (todas verificadas com `tsc`/`eslint`/`vitest` e commitadas,
 salvo indicação). Detalhe fino disponível no git log.
 
+- **2026-07-17** — Tênis: regressão do `2737750` corrigida (cache/inflight de
+  `loadWindow` com tipo inconsistente matava o autocomplete do 2º keystroke em
+  diante); retry em 429 removido + breaker por página/tour (1º 429 encerra a
+  cascata — antes queimava até 17 requests extras); fallback Flashscore em
+  qualquer falha do primário (não só 429 — timeouts ficavam sem fonte);
+  candidatos Flashscore 5→3; aviso de cota removido da UI e
+  `tennisQuotaLimited` global eliminado; teste antigo (que fixava "18 chamadas
+  × 3 retries" como contrato) reescrito — 151/151. Verificado com vitest +
+  `vite build`; tsc limpo nos módulos alterados (`useTelegramLink.ts`
+  pré-existente, ver #T2). `tennis.ts`, `tennis.test.ts`, `sportsdb.ts`,
+  `EventAutocomplete.tsx`.
 - **2026-07-13** — Autocomplete: (1) MMA secundário sem busca de lutador
   (`fighterFallback: false`); (2) busca "A x B" consulta agenda dos dois times,
   match por token ≥3 chars e retry com token mais longo (caso Halmstad x BK

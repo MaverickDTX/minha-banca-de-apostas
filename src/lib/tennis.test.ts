@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke } },
 }));
 
-import { __resetMatchstatBreaker, matchesTennisQuery, searchTennisMatches, tennisQuotaLimited } from "./tennis";
+import { __resetMatchstatBreaker, matchesTennisQuery, searchTennisMatches } from "./tennis";
 
 describe("matchesTennisQuery", () => {
   const jadeVsAubriot = "daniel jade alexandre aubriot";
@@ -27,29 +27,41 @@ describe("matchesTennisQuery", () => {
   });
 });
 
-describe("searchTennisMatches fallback Flashscore", () => {
+describe("searchTennisMatches", () => {
   beforeEach(() => {
     invoke.mockReset();
-    tennisQuotaLimited.value = false;
     __resetMatchstatBreaker(); // estado de modulo persiste entre casos
-    // Fake timers: os retries de 429 usam setTimeout (wait). Sem timers falsos
-    // cada teste espera ~9s reais; com eles adiantamos o relogio e roda em ms.
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   // allowFlashscore:true simula a busca PRIMARIA de tenis (unica que aciona o fallback).
-  const runWithTimers = async (query: string) => {
-    const promise = searchTennisMatches(query, undefined, { allowFlashscore: true });
-    await vi.runAllTimersAsync();
-    return promise;
-  };
+  const run = (query: string) => searchTennisMatches(query, undefined, { allowFlashscore: true });
 
   // Resposta do primario (Matchstat) simulando cota estourada (429).
   const quotaError = () => ({ data: { ok: false, status: 429, body: null }, error: null });
+  // Falha generica do invoke (ex.: timeout da edge function).
+  const invokeError = () => ({ data: null, error: new Error("timeout") });
+
+  // Pagina do Matchstat com um fixture do confronto Jade x Aubriot.
+  const matchstatPage = () => ({
+    data: {
+      ok: true,
+      status: 200,
+      body: {
+        data: [
+          {
+            id: 111,
+            date: "2026-07-20T14:00:00",
+            player1: { id: 1, name: "Daniel Jade" },
+            player2: { id: 2, name: "Alexandre Aubriot" },
+          },
+        ],
+        hasNextPage: false,
+      },
+    },
+    error: null,
+  });
+  // Pagina vazia (tour sem jogos na janela).
+  const emptyPage = () => ({ data: { ok: true, status: 200, body: { data: [], hasNextPage: false } }, error: null });
 
   // Resposta do Flashscore: search acha o jogador, results traz o confronto Jade x Aubriot.
   const fsSearch = () => ({
@@ -81,28 +93,93 @@ describe("searchTennisMatches fallback Flashscore", () => {
     error: null,
   });
 
-  it("cai no Flashscore quando o primario volta 429 e acha o confronto", async () => {
-    // 6 tours (recent+upcoming) x ate 3 tentativas cada = 18 chamadas do primario,
-    // todas 429. Depois vem search + results + fixtures do Flashscore (once FIFO).
-    for (let i = 0; i < 18; i++) invoke.mockImplementationOnce(quotaError);
+  it("um unico 429 arma o breaker: NENHUMA outra chamada ao primario, cai no Flashscore", async () => {
+    // 1 chamada do primario (ATP recent, 429) e a cascata inteira para —
+    // sem retries, sem WTA/ITF, sem janela upcoming. Depois so Flashscore.
     invoke
-      .mockImplementationOnce(fsSearch) // flashscore search
-      .mockImplementationOnce(fsResults) // flashscore results
+      .mockImplementationOnce(quotaError) // ATP recent p.1 -> 429, breaker arma
+      .mockImplementationOnce(fsSearch)   // flashscore search
+      .mockImplementationOnce(fsResults)  // flashscore results
       .mockImplementationOnce(fsResults); // flashscore fixtures (mesmo shape)
 
-    const res = await runWithTimers("Daniel Jade x Alexandre Aubriot");
+    const res = await run("Daniel Jade x Alexandre Aubriot");
     expect(res.length).toBeGreaterThan(0);
     expect(res[0].name).toBe("Jade D. x Aubriot A.");
     expect(res[0].league).toBe("ITF");
-    expect(tennisQuotaLimited.value).toBe(false);
+    // 1 primario + 3 flashscore. Regressao aqui = retry/cascata queimando cota.
+    expect(invoke).toHaveBeenCalledTimes(4);
   });
 
-  it("marca quota limitada quando primario 429 e Flashscore tambem falha", async () => {
-    for (let i = 0; i < 18; i++) invoke.mockImplementationOnce(quotaError);
-    invoke.mockImplementationOnce(() => ({ data: { ok: true, status: 200, body: [] }, error: null })); // search vazio
+  it("com breaker armado, busca seguinte vai direto ao Flashscore (zero chamadas ao primario)", async () => {
+    invoke
+      .mockImplementationOnce(quotaError)
+      .mockImplementationOnce(fsSearch)
+      .mockImplementationOnce(fsResults)
+      .mockImplementationOnce(fsResults);
+    await run("Daniel Jade x Alexandre Aubriot");
+    invoke.mockClear();
 
-    const res = await runWithTimers("Daniel Jade x Alexandre Aubriot");
+    invoke
+      .mockImplementationOnce(fsSearch)
+      .mockImplementationOnce(fsResults)
+      .mockImplementationOnce(fsResults);
+    const res = await run("Daniel Jade x Alexandre Aubriot");
+    expect(res.length).toBeGreaterThan(0);
+    const bodies = invoke.mock.calls.map(([, opts]) => opts?.body);
+    expect(bodies.every((b: { provider?: string }) => b?.provider === "flashscore")).toBe(true);
+  });
+
+  it("com breaker armado e allowFlashscore=false (fonte secundaria), retorna vazio sem nenhuma request", async () => {
+    invoke.mockImplementationOnce(quotaError).mockImplementation(fsSearch);
+    await run("Daniel Jade x Alexandre Aubriot"); // arma o breaker
+    invoke.mockClear();
+
+    const res = await searchTennisMatches("Daniel Jade", undefined);
     expect(res).toEqual([]);
-    expect(tennisQuotaLimited.value).toBe(true);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("falha nao-429 (timeout do invoke) tambem aciona o fallback Flashscore", async () => {
+    // recent: ATP falha por timeout -> tour incompleto; WTA/ITF vazios;
+    // upcoming: 3 tours vazios; janela recent incompleta -> fallback dispara.
+    invoke
+      .mockImplementationOnce(invokeError) // ATP recent (timeout)
+      .mockImplementationOnce(emptyPage)   // WTA recent
+      .mockImplementationOnce(emptyPage)   // ITF recent
+      .mockImplementationOnce(emptyPage)   // ATP upcoming
+      .mockImplementationOnce(emptyPage)   // WTA upcoming
+      .mockImplementationOnce(emptyPage)   // ITF upcoming
+      .mockImplementationOnce(fsSearch)
+      .mockImplementationOnce(fsResults)
+      .mockImplementationOnce(fsResults);
+
+    const res = await run("Daniel Jade x Alexandre Aubriot");
+    expect(res.length).toBeGreaterThan(0);
+    expect(res[0].league).toBe("ITF");
+  });
+
+  it("carga completa e vazia NAO gasta cota do Flashscore", async () => {
+    for (let i = 0; i < 6; i++) invoke.mockImplementationOnce(emptyPage);
+    const res = await run("Daniel Jade x Alexandre Aubriot");
+    expect(res).toEqual([]);
+    expect(invoke).toHaveBeenCalledTimes(6); // nenhuma chamada flashscore
+  });
+
+  it("cache da janela: segunda busca na mesma janela nao refaz requests do primario", async () => {
+    // Regressao do bug do commit 2737750: o cache guardava IndexedEvent[] mas o
+    // consumidor esperava { events, complete } -> TypeError no segundo keystroke.
+    invoke
+      .mockImplementationOnce(matchstatPage) // ATP recent (traz o confronto)
+      .mockImplementationOnce(emptyPage)     // WTA recent
+      .mockImplementationOnce(emptyPage);    // ITF recent
+    const first = await run("Daniel Jade");
+    expect(first.length).toBe(1);
+    expect(invoke).toHaveBeenCalledTimes(3);
+
+    invoke.mockClear();
+    const second = await run("Daniel Jade x Alexandre Aubriot"); // mesma janela, cache hit
+    expect(second.length).toBe(1);
+    expect(second[0].name).toBe("Daniel Jade x Alexandre Aubriot");
+    expect(invoke).not.toHaveBeenCalled();
   });
 });
