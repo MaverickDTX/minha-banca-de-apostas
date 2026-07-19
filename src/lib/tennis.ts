@@ -67,6 +67,59 @@ const tripMatchstatBreaker = () => { matchstatBlockedUntil = Date.now() + COOLDO
 // Reset do breaker — usado só em testes (estado de módulo persiste entre casos).
 export const __resetMatchstatBreaker = () => { matchstatBlockedUntil = 0; };
 
+// ---- Cache persistido (fase 2, §9 do plano) --------------------------------
+// Hot path: a tabela public.tennis_matches_cache é populada por cron (12 req/dia
+// fixas na RapidAPI) e o autocomplete busca por nome no NOSSO Postgres — custo
+// de cota externa ZERO por keystroke. O caminho de edge function (fase 1) vira
+// fallback para tabela vazia/stale (cron ainda não rodou ou está quebrado).
+const DB_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 4× o TTL do cron (6h)
+const DB_META_TTL_MS = 5 * 60 * 1000; // memo da checagem de frescor
+let dbUsableMemo: boolean | null = null;
+let dbUsableAt = 0;
+export const __resetTennisDbCache = () => { dbUsableMemo = null; dbUsableAt = 0; };
+
+async function tennisDbUsable(): Promise<boolean> {
+  if (dbUsableMemo !== null && Date.now() - dbUsableAt < DB_META_TTL_MS) return dbUsableMemo;
+  const { data, error } = await supabase
+    .from("tennis_matches_cache")
+    .select("refreshed_at")
+    .order("refreshed_at", { ascending: false })
+    .limit(1);
+  const last = !error && data?.[0]?.refreshed_at ? Date.parse(data[0].refreshed_at) : 0;
+  dbUsableMemo = Date.now() - last < DB_CACHE_MAX_AGE_MS;
+  dbUsableAt = Date.now();
+  return dbUsableMemo;
+}
+
+// Escapa curingas do ILIKE — a query vem do usuário.
+const likePattern = (s: string) => `%${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+// null = falha de leitura (cai no caminho legado); [] = resultado legítimo.
+async function searchTennisDb(q: string): Promise<SportEvent[] | null> {
+  const players = q.split(/\s+(?:x|vs\.?)\s+/i).filter(Boolean);
+  // hay é gravado normalizado (minúsculo, sem acento) pelo cron — mesma normText.
+  // Confronto "A x B": dois ilike encadeados (AND); jogador único: um só.
+  let query = supabase
+    .from("tennis_matches_cache")
+    .select("match_id,tour,starts_at,player1_name,player2_name");
+  for (const term of players.length === 2 ? players : [q]) {
+    query = query.ilike("hay", likePattern(term));
+  }
+  const { data, error } = await query
+    .order("starts_at", { ascending: true, nullsFirst: false })
+    .limit(15);
+  if (error || !data) return null;
+  return data.map((row) => ({
+    id: `tennis-${row.tour}-${row.match_id}`,
+    name: `${row.player1_name} x ${row.player2_name}`,
+    sport: "Tênis",
+    league: row.tour.toUpperCase(),
+    date: row.starts_at ? new Date(row.starts_at).toISOString() : null,
+    homeTeam: row.player1_name,
+    awayTeam: row.player2_name,
+  }));
+}
+
 type Envelope = { ok?: boolean; status?: number; body?: unknown } | null;
 type FixturesPage = {
   data?: TennisFixture[] | { data?: TennisFixture[]; hasNextPage?: boolean };
@@ -277,6 +330,16 @@ export async function searchTennisMatches(
   const allowFlashscore = opts?.allowFlashscore ?? false;
   const q = normText(query);
   if (q.length < 3) return [];
+
+  // Fase 2 (§9): com o cache do Postgres fresco, TODA busca resolve aqui —
+  // inclusive vazia (jogo ausente do snapshot é resultado legítimo, não falha).
+  // Só desce ao caminho legado (edge → RapidAPI) se a tabela estiver vazia,
+  // stale (> 24h) ou a leitura falhar.
+  if (await tennisDbUsable()) {
+    const fromDb = await searchTennisDb(q);
+    if (fromDb !== null) return fromDb;
+  }
+
   const filterAndSort = (fixtures: IndexedEvent[]) => fixtures
     .filter((fixture) => matchesTennisQuery(fixture._hay, q))
     .sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))

@@ -374,6 +374,51 @@ export type Database = {
         }
         Relationships: []
       }
+      tennis_matches_cache: {
+        Row: {
+          hay: string
+          is_past: boolean
+          match_id: number
+          player1_id: number | null
+          player1_name: string
+          player2_id: number | null
+          player2_name: string
+          rank_id: number | null
+          refreshed_at: string
+          starts_at: string | null
+          tour: string
+          tournament: string | null
+        }
+        Insert: {
+          hay: string
+          is_past?: boolean
+          match_id: number
+          player1_id?: number | null
+          player1_name: string
+          player2_id?: number | null
+          player2_name: string
+          rank_id?: number | null
+          refreshed_at?: string
+          starts_at?: string | null
+          tour: string
+          tournament?: string | null
+        }
+        Update: {
+          hay?: string
+          is_past?: boolean
+          match_id?: number
+          player1_id?: number | null
+          player1_name?: string
+          player2_id?: number | null
+          player2_name?: string
+          rank_id?: number | null
+          refreshed_at?: string
+          starts_at?: string | null
+          tour?: string
+          tournament?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

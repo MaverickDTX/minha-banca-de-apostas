@@ -1,6 +1,18 @@
 # Plano técnico — Reescrita do autocomplete de tênis (redução de cota)
 
-Status: **proposta com desenho fechado**. Data: 2026-07-17.
+Status: **fases 1 e 2 implementadas** (fase 2 aguardando deploy). Atualizado: 2026-07-19.
+
+**Fase 1 (§10) — no ar:** board `ms-api/upcoming` + histórico -7d..-1d no cliente,
+edge function com passthrough allowlisted, 151 testes verdes.
+
+**Fase 2 (§9) — implementada, pendente de deploy:** decisões §9.7 fechadas em
+2026-07-19 (pg_cron+pg_net → edge function; SELECT direto com RLS; poda -8d +
+stale de upcoming 2×TTL). Entregues: migration `20260719130000_tennis_matches_cache.sql`
+(tabela + trgm + RLS + cron 6h), edge function `tennis-refresh` (ciclo de 3
+chamadas, guarda de frescor de 2h, shared secret do Vault), cliente cache-first
+(`searchTennisDb`; legado fase 1 vira fallback para tabela vazia/stale >24h).
+Pendências de deploy: criar `TENNIS_REFRESH_SECRET` no Vault, `supabase db push`,
+`supabase functions deploy tennis-refresh --no-verify-jwt`, push do front.
 Escopo pedido: reduzir a pressão sobre a cota da RapidAPI no caminho de
 autocomplete de tênis, hoje baseado em paginação de fixtures por janela de data.
 
