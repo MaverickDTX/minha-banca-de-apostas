@@ -340,7 +340,7 @@ export default function Dashboard() {
               />
               <Legend
                 verticalAlign="bottom"
-                formatter={(_value: string, entry: { payload?: { label?: string } }) => entry?.payload?.label ?? ""}
+                formatter={(_value: string, entry: any) => entry?.payload?.label ?? ""}
                 wrapperStyle={{ fontSize: 11 }}
               />
               <Pie

@@ -1,0 +1,592 @@
+diff --git a/HANDOFF.md b/HANDOFF.md
+index 9f67bc8..0001d62 100644
+--- a/HANDOFF.md
++++ b/HANDOFF.md
+@@ -1,24 +1,57 @@
+ # Handoff — Bankroll Pro (minha-banca-de-apostas)
+ 
+-Última atualização: 2026-07-13
++Última atualização: 2026-07-17
+ 
+ Planilha web para controle de apostas esportivas: registro de apostas, gestão de
+ banca e análise de desempenho (ROI, yield, taxa de acerto, drawdown, CLV, EV, Kelly).
+ 
+ ## Estado atual
+ 
+-- `origin/main`: `c9202e5`. Local `main` à frente por 3 commits (docs handoff +
+-  fix MMA fighterFallback + fix busca "A x B"). **Push pendente pelo Windows**
+-  (sandbox sem credencial git).
+-- Verificação da sessão 2026-07-13: `tsc --noEmit` 0 erros, `vitest` 119/119 OK.
++- `origin/main`: `2737750` (feat tênis fallback Flashscore + breaker). O estado
++  "c9202e5 + 3 commits locais" registrado em 2026-07-13 já foi pushado.
++- Verificação da sessão 2026-07-17: `vitest` 151/151 OK; `vite build` OK.
++  **`tsc --noEmit` NÃO está limpo** — 8 erros pré-existentes em
++  `useTelegramLink.ts` (tipos gerados do Supabase sem a tabela `telegram_links`;
++  ver backlog #T2). Zero erros nos módulos de tênis/autocomplete.
++- **Fix 2026-07-17 (autocomplete tênis — regressão do `2737750`):** o refactor de
++  `loadWindow` para `{ events, quotaLimited }` não atualizou cache/inflight, que
++  seguiam tipados como `IndexedEvent[]`. 1ª busca funcionava (cache frio); da 2ª
++  em diante o cache hit devolvia array onde se esperava objeto → `TypeError`
++  engolido → autocomplete morto ao adicionar/editar. O `vite build` não roda
++  `tsc` (esbuild só transpila), então o erro — apontado pelo `tsc` — chegou a
++  produção. Corrigido: tipos consistentes (`WindowResult`), teste de regressão
++  do cache adicionado.
++- **Fix 2026-07-17 (cota Matchstat):** (1) retry em 429 removido — na RapidAPI
++  cada 429 debita da cota, o retry triplicava o gasto; (2) breaker consultado
++  por página (`loadTour`) e por tour (`loadWindow`), não só no início da busca —
++  antes um 429 no ATP ainda deixava WTA/ITF/upcoming queimarem até 17 requests.
++  Contrato em teste: exatamente 1 chamada ao primário antes do fallback.
++- **Fix 2026-07-17 (fallback Flashscore intermitente):** fallback disparava só
++  com 429 sinalizado no envelope; timeout da edge function (frequente com a
++  cascata antiga de 18+ requests em série) deixava `quotaLimited=false` e
++  nenhuma fonte respondia. Agora dispara em QUALQUER carga incompleta (429,
++  timeout, 5xx). Candidatos do search Flashscore: 5 → 3 (2 req/candidato contra
++  cota de 500/mês).
++- **UX 2026-07-17 (decisão do usuário):** aviso "cota temporariamente limitada"
++  removido da UI — popover vazio mostra sempre "Nenhum evento encontrado."
++  `tennisQuotaLimited` (estado global mutável) eliminado de
++  `tennis.ts`/`sportsdb.ts`/`EventAutocomplete.tsx`.
+ - Autocomplete MMA: agora busca em cascata **TheSportsDB → Odds API → API-Sports MMA** quando o primário falha. Todos os caches armazenam resultados vazios (evita re-fetch infinito).
+ - MMA como fonte secundária universal: aparece nos resultados independente do esporte selecionado (como F1 e Tênis já faziam). **Fix 2026-07-13:** a fonte secundária agora passa `fighterFallback: false` — só usa os caches TSDB+Odds. Antes, qualquer query de outro esporte que não coincidisse com luta caía no terciário e disparava `/fighters?search=<time de futebol>` na API-Sports (quota + latência à toa).
+ - **Fix 2026-07-13 (busca "A x B"):** a key gratuita do TheSportsDB trunca `eventsnext.php` a **1 evento** (verificado ao vivo), então buscar só a agenda do lado A perdia confrontos (caso real: "Halmstad x BK Hacken" — o next do Halmstad ainda era o jogo de hoje já encerrado; o confronto só aparecia no next do Häcken). Agora: (1) busca a agenda dos dois lados; (2) filtro exige ambos os lados, casando por tokens ≥3 chars ("BK Hacken" casa com "Halmstad vs Häcken" via token "hacken"; frase inteira falhava); (3) retry com o token mais longo quando o filtro zera (`searchteams.php?t=BK Hacken` devolve só o time feminino; `t=Hacken` acha o masculino).
+ 
+ ## Backlog vivo
+ 
+-Não há tarefa de código pendente confirmada. Os itens abaixo são bloqueios de
+-plano ou decisões conscientes de adiamento — nenhum é bug em aberto.
++**Tarefas de código pendentes (sessão 2026-07-17):**
++
++- **#T1 — `tsc` no build** — o script `build` é só `vite build` (esbuild apaga
++  tipos SEM checar; `lint` também não pega erro de tipo). Foi assim que a
++  regressão do `2737750` chegou a produção. Trocar para
++  `tsc --noEmit -p tsconfig.app.json && vite build`. **Bloqueado por #T2** (o
++  build passaria a falhar nos 8 erros pré-existentes).
++- **#T2 — regenerar tipos do Supabase** — `src/integrations/supabase/types.ts`
++  não inclui `telegram_links` → 8 erros em `useTelegramLink.ts`. Rodar
++  `supabase gen types typescript` e commitar. Pré-requisito de #T1.
+ 
+ 1. **Leaked Password Protection (Supabase)** — BLOQUEADO POR PLANO. Advisor
+    `auth_leaked_password_protection` (WARN) fica aberto. O toggle é feature Pro
+@@ -37,6 +70,13 @@ plano ou decisões conscientes de adiamento — nenhum é bug em aberto.
+ 
+ ### Ideias registradas (sem compromisso)
+ 
++- **#B — busca por jogador no Matchstat**: mesmo corrigida, a arquitetura do
++  tênis gasta até 9 requests por janela fria (3 tours × 3 páginas de fixtures,
++  filtro client-side) — até 18 numa busca que consulta recent + upcoming. Se a
++  doc (`tennisapidoc.matchstat.com`) expuser endpoint de busca/fixtures por
++  jogador, trocar a paginação de janelas por busca direta reduziria a 1–2
++  requests por query e tornaria o 429 raro em vez de rotineiro. Conferir a doc
++  antes de qualquer refactor.
+ - **#A — expansão multi-esporte**: rotear o fallback API-Sports pelo esporte
+   selecionado. Decidir antes: `VITE_API_SPORTS_KEY` vai ao bundle (visitante pode
+   extrair e queimar a cota); se o app deixar de ser pessoal, mover para uma Edge
+@@ -113,6 +153,17 @@ peça ao usuário em vez de gastar tokens contornando o bug do FUSE.
+ Histórico de sessões (todas verificadas com `tsc`/`eslint`/`vitest` e commitadas,
+ salvo indicação). Detalhe fino disponível no git log.
+ 
++- **2026-07-17** — Tênis: regressão do `2737750` corrigida (cache/inflight de
++  `loadWindow` com tipo inconsistente matava o autocomplete do 2º keystroke em
++  diante); retry em 429 removido + breaker por página/tour (1º 429 encerra a
++  cascata — antes queimava até 17 requests extras); fallback Flashscore em
++  qualquer falha do primário (não só 429 — timeouts ficavam sem fonte);
++  candidatos Flashscore 5→3; aviso de cota removido da UI e
++  `tennisQuotaLimited` global eliminado; teste antigo (que fixava "18 chamadas
++  × 3 retries" como contrato) reescrito — 151/151. Verificado com vitest +
++  `vite build`; tsc limpo nos módulos alterados (`useTelegramLink.ts`
++  pré-existente, ver #T2). `tennis.ts`, `tennis.test.ts`, `sportsdb.ts`,
++  `EventAutocomplete.tsx`.
+ - **2026-07-13** — Autocomplete: (1) MMA secundário sem busca de lutador
+   (`fighterFallback: false`); (2) busca "A x B" consulta agenda dos dois times,
+   match por token ≥3 chars e retry com token mais longo (caso Halmstad x BK
+diff --git a/src/components/bets/EventAutocomplete.tsx b/src/components/bets/EventAutocomplete.tsx
+index cea2fb1..0d2132f 100644
+--- a/src/components/bets/EventAutocomplete.tsx
++++ b/src/components/bets/EventAutocomplete.tsx
+@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
+ import { Input } from "@/components/ui/input";
+ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+ import { searchEvents, mapSportLabel, type SportEvent } from "@/lib/sportsdb";
+-import { tennisQuotaLimited } from "@/lib/tennis";
+ import { Loader2, CalendarDays } from "lucide-react";
+ 
+ type Pick = {
+@@ -30,7 +29,6 @@ export function EventAutocomplete({
+   const [open, setOpen] = useState(false);
+   const [loading, setLoading] = useState(false);
+   const [results, setResults] = useState<SportEvent[]>([]);
+-  const [quotaLimited, setQuotaLimited] = useState(false);
+   const abortRef = useRef<AbortController | null>(null);
+   const skipQueryRef = useRef<string | null>(value || null);
+ 
+@@ -42,7 +40,7 @@ export function EventAutocomplete({
+     }
+     // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
+     // útil e cada disparo custa até 6 requests somando as duas APIs.
+-    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); setQuotaLimited(false); return; }
++    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); return; }
+     const handle = setTimeout(async () => {
+       abortRef.current?.abort();
+       const ctrl = new AbortController();
+@@ -52,7 +50,6 @@ export function EventAutocomplete({
+         const list = await searchEvents(q, ctrl.signal, sport);
+         if (!ctrl.signal.aborted) {
+           setResults(list);
+-          setQuotaLimited(tennisQuotaLimited.value);
+           setOpen(true);
+         }
+       } finally {
+@@ -101,9 +98,7 @@ export function EventAutocomplete({
+       >
+         {results.length === 0 ? (
+           <div className="p-3 text-xs text-muted-foreground">
+-            {quotaLimited
+-              ? "Busca de tênis temporariamente limitada pela fonte (cota diária). Tente mais tarde."
+-              : "Nenhum evento encontrado."}
++            Nenhum evento encontrado.
+           </div>
+         ) : (
+           <ul className="py-1">
+diff --git a/src/lib/sportsdb.ts b/src/lib/sportsdb.ts
+index 3182034..a336957 100644
+--- a/src/lib/sportsdb.ts
++++ b/src/lib/sportsdb.ts
+@@ -7,7 +7,7 @@ const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
+ import { translateEventName, translateLeague, translateTeamName, translateQueryToEnglish } from "@/lib/translate";
+ import { searchEventsBySport, hasApiProduct, shouldTryTheSportsDbFirst } from "@/lib/apisportsMulti";
+ import { searchF1Races } from "@/lib/apisportsF1";
+-import { searchTennisMatches, tennisQuotaLimited } from "@/lib/tennis";
++import { searchTennisMatches } from "@/lib/tennis";
+ import { searchMmaEvents } from "@/lib/mma";
+ 
+ export type SportEvent = {
+@@ -197,7 +197,6 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?:
+ 
+   // Tênis: Matchstat via proxy (edge function tennis-fixtures); fallback TheSportsDB (cobertura fraca)
+   if (rawLabel === "tênis") {
+-    tennisQuotaLimited.value = false;
+     // allowFlashscore: busca primária de tênis pode acionar o fallback (cota Flashscore).
+     const tennis = await searchTennisMatches(q, signal, { allowFlashscore: true });
+     if (tennis.length > 0) return tennis;
+diff --git a/src/lib/tennis.test.ts b/src/lib/tennis.test.ts
+index 0cda30d..11528d8 100644
+--- a/src/lib/tennis.test.ts
++++ b/src/lib/tennis.test.ts
+@@ -1,11 +1,11 @@
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+ vi.mock("@/integrations/supabase/client", () => ({
+   supabase: { functions: { invoke } },
+ }));
+ 
+-import { __resetMatchstatBreaker, matchesTennisQuery, searchTennisMatches, tennisQuotaLimited } from "./tennis";
++import { __resetMatchstatBreaker, matchesTennisQuery, searchTennisMatches } from "./tennis";
+ 
+ describe("matchesTennisQuery", () => {
+   const jadeVsAubriot = "daniel jade alexandre aubriot";
+@@ -27,29 +27,41 @@ describe("matchesTennisQuery", () => {
+   });
+ });
+ 
+-describe("searchTennisMatches fallback Flashscore", () => {
++describe("searchTennisMatches", () => {
+   beforeEach(() => {
+     invoke.mockReset();
+-    tennisQuotaLimited.value = false;
+     __resetMatchstatBreaker(); // estado de modulo persiste entre casos
+-    // Fake timers: os retries de 429 usam setTimeout (wait). Sem timers falsos
+-    // cada teste espera ~9s reais; com eles adiantamos o relogio e roda em ms.
+-    vi.useFakeTimers();
+-  });
+-
+-  afterEach(() => {
+-    vi.useRealTimers();
+   });
+ 
+   // allowFlashscore:true simula a busca PRIMARIA de tenis (unica que aciona o fallback).
+-  const runWithTimers = async (query: string) => {
+-    const promise = searchTennisMatches(query, undefined, { allowFlashscore: true });
+-    await vi.runAllTimersAsync();
+-    return promise;
+-  };
++  const run = (query: string) => searchTennisMatches(query, undefined, { allowFlashscore: true });
+ 
+   // Resposta do primario (Matchstat) simulando cota estourada (429).
+   const quotaError = () => ({ data: { ok: false, status: 429, body: null }, error: null });
++  // Falha generica do invoke (ex.: timeout da edge function).
++  const invokeError = () => ({ data: null, error: new Error("timeout") });
++
++  // Pagina do Matchstat com um fixture do confronto Jade x Aubriot.
++  const matchstatPage = () => ({
++    data: {
++      ok: true,
++      status: 200,
++      body: {
++        data: [
++          {
++            id: 111,
++            date: "2026-07-20T14:00:00",
++            player1: { id: 1, name: "Daniel Jade" },
++            player2: { id: 2, name: "Alexandre Aubriot" },
++          },
++        ],
++        hasNextPage: false,
++      },
++    },
++    error: null,
++  });
++  // Pagina vazia (tour sem jogos na janela).
++  const emptyPage = () => ({ data: { ok: true, status: 200, body: { data: [], hasNextPage: false } }, error: null });
+ 
+   // Resposta do Flashscore: search acha o jogador, results traz o confronto Jade x Aubriot.
+   const fsSearch = () => ({
+@@ -81,28 +93,93 @@ describe("searchTennisMatches fallback Flashscore", () => {
+     error: null,
+   });
+ 
+-  it("cai no Flashscore quando o primario volta 429 e acha o confronto", async () => {
+-    // 6 tours (recent+upcoming) x ate 3 tentativas cada = 18 chamadas do primario,
+-    // todas 429. Depois vem search + results + fixtures do Flashscore (once FIFO).
+-    for (let i = 0; i < 18; i++) invoke.mockImplementationOnce(quotaError);
++  it("um unico 429 arma o breaker: NENHUMA outra chamada ao primario, cai no Flashscore", async () => {
++    // 1 chamada do primario (ATP recent, 429) e a cascata inteira para —
++    // sem retries, sem WTA/ITF, sem janela upcoming. Depois so Flashscore.
+     invoke
+-      .mockImplementationOnce(fsSearch) // flashscore search
+-      .mockImplementationOnce(fsResults) // flashscore results
++      .mockImplementationOnce(quotaError) // ATP recent p.1 -> 429, breaker arma
++      .mockImplementationOnce(fsSearch)   // flashscore search
++      .mockImplementationOnce(fsResults)  // flashscore results
+       .mockImplementationOnce(fsResults); // flashscore fixtures (mesmo shape)
+ 
+-    const res = await runWithTimers("Daniel Jade x Alexandre Aubriot");
++    const res = await run("Daniel Jade x Alexandre Aubriot");
+     expect(res.length).toBeGreaterThan(0);
+     expect(res[0].name).toBe("Jade D. x Aubriot A.");
+     expect(res[0].league).toBe("ITF");
+-    expect(tennisQuotaLimited.value).toBe(false);
++    // 1 primario + 3 flashscore. Regressao aqui = retry/cascata queimando cota.
++    expect(invoke).toHaveBeenCalledTimes(4);
++  });
++
++  it("com breaker armado, busca seguinte vai direto ao Flashscore (zero chamadas ao primario)", async () => {
++    invoke
++      .mockImplementationOnce(quotaError)
++      .mockImplementationOnce(fsSearch)
++      .mockImplementationOnce(fsResults)
++      .mockImplementationOnce(fsResults);
++    await run("Daniel Jade x Alexandre Aubriot");
++    invoke.mockClear();
++
++    invoke
++      .mockImplementationOnce(fsSearch)
++      .mockImplementationOnce(fsResults)
++      .mockImplementationOnce(fsResults);
++    const res = await run("Daniel Jade x Alexandre Aubriot");
++    expect(res.length).toBeGreaterThan(0);
++    const bodies = invoke.mock.calls.map(([, opts]) => opts?.body);
++    expect(bodies.every((b: { provider?: string }) => b?.provider === "flashscore")).toBe(true);
+   });
+ 
+-  it("marca quota limitada quando primario 429 e Flashscore tambem falha", async () => {
+-    for (let i = 0; i < 18; i++) invoke.mockImplementationOnce(quotaError);
+-    invoke.mockImplementationOnce(() => ({ data: { ok: true, status: 200, body: [] }, error: null })); // search vazio
++  it("com breaker armado e allowFlashscore=false (fonte secundaria), retorna vazio sem nenhuma request", async () => {
++    invoke.mockImplementationOnce(quotaError).mockImplementation(fsSearch);
++    await run("Daniel Jade x Alexandre Aubriot"); // arma o breaker
++    invoke.mockClear();
+ 
+-    const res = await runWithTimers("Daniel Jade x Alexandre Aubriot");
++    const res = await searchTennisMatches("Daniel Jade", undefined);
+     expect(res).toEqual([]);
+-    expect(tennisQuotaLimited.value).toBe(true);
++    expect(invoke).not.toHaveBeenCalled();
++  });
++
++  it("falha nao-429 (timeout do invoke) tambem aciona o fallback Flashscore", async () => {
++    // recent: ATP falha por timeout -> tour incompleto; WTA/ITF vazios;
++    // upcoming: 3 tours vazios; janela recent incompleta -> fallback dispara.
++    invoke
++      .mockImplementationOnce(invokeError) // ATP recent (timeout)
++      .mockImplementationOnce(emptyPage)   // WTA recent
++      .mockImplementationOnce(emptyPage)   // ITF recent
++      .mockImplementationOnce(emptyPage)   // ATP upcoming
++      .mockImplementationOnce(emptyPage)   // WTA upcoming
++      .mockImplementationOnce(emptyPage)   // ITF upcoming
++      .mockImplementationOnce(fsSearch)
++      .mockImplementationOnce(fsResults)
++      .mockImplementationOnce(fsResults);
++
++    const res = await run("Daniel Jade x Alexandre Aubriot");
++    expect(res.length).toBeGreaterThan(0);
++    expect(res[0].league).toBe("ITF");
++  });
++
++  it("carga completa e vazia NAO gasta cota do Flashscore", async () => {
++    for (let i = 0; i < 6; i++) invoke.mockImplementationOnce(emptyPage);
++    const res = await run("Daniel Jade x Alexandre Aubriot");
++    expect(res).toEqual([]);
++    expect(invoke).toHaveBeenCalledTimes(6); // nenhuma chamada flashscore
++  });
++
++  it("cache da janela: segunda busca na mesma janela nao refaz requests do primario", async () => {
++    // Regressao do bug do commit 2737750: o cache guardava IndexedEvent[] mas o
++    // consumidor esperava { events, complete } -> TypeError no segundo keystroke.
++    invoke
++      .mockImplementationOnce(matchstatPage) // ATP recent (traz o confronto)
++      .mockImplementationOnce(emptyPage)     // WTA recent
++      .mockImplementationOnce(emptyPage);    // ITF recent
++    const first = await run("Daniel Jade");
++    expect(first.length).toBe(1);
++    expect(invoke).toHaveBeenCalledTimes(3);
++
++    invoke.mockClear();
++    const second = await run("Daniel Jade x Alexandre Aubriot"); // mesma janela, cache hit
++    expect(second.length).toBe(1);
++    expect(second[0].name).toBe("Daniel Jade x Alexandre Aubriot");
++    expect(invoke).not.toHaveBeenCalled();
+   });
+ });
+diff --git a/src/lib/tennis.ts b/src/lib/tennis.ts
+index 645e561..8ad9163 100644
+--- a/src/lib/tennis.ts
++++ b/src/lib/tennis.ts
+@@ -31,24 +31,24 @@ export function matchesTennisQuery(haystack: string, query: string): boolean {
+ const fmt = (d: Date) => d.toISOString().slice(0, 10);
+ 
+ type IndexedEvent = SportEvent & { _hay: string };
++type WindowResult = { events: IndexedEvent[]; complete: boolean };
++// Só cargas COMPLETAS entram no cache, logo todo hit é { complete: true }.
+ const fixturesCache = new Map<string, IndexedEvent[]>();
+ // Dedup de carga em voo: buscas concorrentes (keystrokes) compartilham a mesma
+-// paginação em vez de cada uma disparar 12 requests e estourar o rate limit.
+-const inflight = new Map<string, Promise<IndexedEvent[]>>();
++// paginação em vez de cada uma disparar a cascata de requests em paralelo.
++const inflight = new Map<string, Promise<WindowResult>>();
+ 
+ // Teto de páginas por tour e janela (proteção contra loop). pageSize=100 → até
+ // 300 fixtures/tour/janela; mantém o autocomplete responsivo mesmo incluindo ITF.
+ const MAX_PAGES = 3;
+ const TOURS = ["atp", "wta", "itf"] as const;
+ type Tour = typeof TOURS[number];
+-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+ 
+ // Circuit breaker: quando o Matchstat devolve 429 (cota DIÁRIA), ele seguirá
+-// devolvendo 429 por horas. Sem isto, CADA busca — inclusive futebol/MMA, que
+-// chamam o tênis como fonte secundária — gastaria ~9s nos 6 tours × 3 retries
+-// antes de desistir. Após um 429, pulamos o Matchstat por COOLDOWN_MS e vamos
+-// direto ao fallback, mantendo a busca responsiva. Passado o cooldown, tenta de
+-// novo (a cota pode ter resetado).
++// devolvendo 429 por horas — e, na RapidAPI, cada 429 CONTA contra a cota.
++// Por isso: (a) NÃO há retry em 429; (b) o breaker é consultado antes de cada
++// página e de cada tour, então o primeiro 429 encerra toda a cascata da busca
++// corrente, não só as buscas futuras. Passado o cooldown, tenta de novo.
+ const COOLDOWN_MS = 10 * 60 * 1000; // 10 min
+ let matchstatBlockedUntil = 0;
+ const matchstatBlocked = () => Date.now() < matchstatBlockedUntil;
+@@ -56,60 +56,73 @@ const tripMatchstatBreaker = () => { matchstatBlockedUntil = Date.now() + COOLDO
+ // Reset do breaker — usado só em testes (estado de módulo persiste entre casos).
+ export const __resetMatchstatBreaker = () => { matchstatBlockedUntil = 0; };
+ 
+-// complete=false apenas quando a paginação foi interrompida por erro (ex.: 429).
+-// Atingir o teto MAX_PAGES com hasNextPage ainda true conta como completo (corte intencional).
+-// quotaLimited=true se a interrupção foi por 429 (cota diária esgotada) — sinaliza
+-// para a UI cair no fallback e, se este também falhar, mostrar aviso de fonte limitada.
+-async function loadTour(type: Tour, start: string, end: string): Promise<{ items: TennisFixture[]; complete: boolean; quotaLimited: boolean }> {
++type Envelope = { ok?: boolean; status?: number; body?: unknown } | null;
++type FixturesPage = {
++  data?: TennisFixture[] | { data?: TennisFixture[]; hasNextPage?: boolean };
++  hasNextPage?: boolean;
++};
++
++// complete=false quando a paginação foi interrompida por QUALQUER falha (429,
++// 5xx, timeout da edge function, erro do invoke) ou pelo breaker já armado.
++// Atingir o teto MAX_PAGES com hasNextPage ainda true conta como completo
++// (corte intencional). Qualquer carga incompleta habilita o fallback na UI —
++// condicionar o fallback só ao 429 deixava timeouts sem nenhuma fonte.
++async function loadTour(type: Tour, start: string, end: string): Promise<{ items: TennisFixture[]; complete: boolean }> {
+   const all: TennisFixture[] = [];
+-  let quotaLimited = false;
+   // A API pagina via pageNo (1-indexed) + hasNextPage. Sem isto pegávamos só os
+   // 100 primeiros fixtures da janela (rodadas iniciais), perdendo jogos posteriores.
+   // Sem AbortSignal aqui de propósito: a janela é carga compartilhada (ver loadWindow),
+   // não pode ser cancelada pelo keystroke que a disparou.
+   for (let pageNo = 1; pageNo <= MAX_PAGES; pageNo++) {
++    // Breaker consultado POR PÁGINA: um 429 em outra chamada concorrente
++    // interrompe esta paginação imediatamente, sem gastar mais cota.
++    if (matchstatBlocked()) return { items: all, complete: false };
+     // Proxy: a edge function injeta a chave (Vault) e devolve { ok, status, body }.
+-    // O plano da RapidAPI limita rajadas; 429 recebe duas novas tentativas curtas.
+-    let data: { ok?: boolean; status?: number; body?: unknown } | null = null;
+-    let error: unknown = null;
+-    for (let attempt = 0; attempt < 3; attempt++) {
+-      const response = await supabase.functions.invoke("tennis-fixtures", {
+-        body: { type, start, end, pageNo },
+-      });
+-      data = response.data;
+-      error = response.error;
+-      if (error || data?.ok || data?.status !== 429 || attempt === 2) break;
+-      quotaLimited = true;
+-      tripMatchstatBreaker(); // cota diária: bloqueia o Matchstat por COOLDOWN_MS
+-      await wait(500 * (attempt + 1));
++    const response = await supabase.functions.invoke("tennis-fixtures", {
++      body: { type, start, end, pageNo },
++    });
++    const data = response.data as Envelope;
++    if (data?.status === 429) {
++      // Cota esgotada: arma o breaker e desiste JÁ — retry em cota diária é
++      // gasto puro (cada 429 também debita da cota na RapidAPI).
++      tripMatchstatBreaker();
++      return { items: all, complete: false };
+     }
+-    // error = falha da função; ok:false = erro upstream (ex.: 429). Ambos = carga incompleta.
+-    if (error || !data?.ok) return { items: all, complete: false, quotaLimited };
+-    const json = data.body;
++    // error = falha da função (inclui timeout); ok:false = erro upstream não-429.
++    if (response.error || !data?.ok) return { items: all, complete: false };
++    const json = data.body as FixturesPage | null;
++    const inner = json?.data;
+     // Envelope pode vir como { data:[...], hasNextPage } ou { data:{ data:[...], hasNextPage } }.
+-    const page: TennisFixture[] = json?.data?.data ?? json?.data ?? [];
++    const page: TennisFixture[] = Array.isArray(inner) ? inner : inner?.data ?? [];
+     if (!Array.isArray(page) || page.length === 0) break;
+     all.push(...page);
+-    const hasNext = json?.data?.hasNextPage ?? json?.hasNextPage ?? false;
++    const hasNext = (Array.isArray(inner) ? json?.hasNextPage : inner?.hasNextPage) ?? false;
+     if (!hasNext) break;
+   }
+-  return { items: all, complete: true, quotaLimited };
++  return { items: all, complete: true };
+ }
+ 
+-async function loadWindow(start: string, end: string): Promise<{ events: IndexedEvent[]; quotaLimited: boolean }> {
++async function loadWindow(start: string, end: string): Promise<WindowResult> {
+   const key = `${start}|${end}`;
+ 
+   const cached = fixturesCache.get(key);
+-  if (cached) return cached;
++  if (cached) return { events: cached, complete: true };
+ 
+   const pending = inflight.get(key);
+   if (pending) return pending;
+ 
+-  const job = (async () => {
++  const job = (async (): Promise<WindowResult> => {
+     // Consultar ATP, WTA e ITF em sequência evita que a primeira digitação
+     // consuma todo o limite de taxa do provedor.
+-    const tours: Array<{ items: TennisFixture[]; complete: boolean; quotaLimited: boolean }> = [];
+-    for (const tour of TOURS) tours.push(await loadTour(tour, start, end));
++    const tours: Array<{ items: TennisFixture[]; complete: boolean }> = [];
++    for (const tour of TOURS) {
++      // Breaker consultado POR TOUR: 429 no ATP não deixa WTA/ITF gastarem cota.
++      if (matchstatBlocked()) {
++        tours.push({ items: [], complete: false });
++        continue;
++      }
++      tours.push(await loadTour(tour, start, end));
++    }
+ 
+     const toEvent = (f: TennisFixture, tour: string): IndexedEvent => {
+       const p1 = f.player1?.name ?? "";
+@@ -130,11 +143,11 @@ async function loadWindow(start: string, end: string): Promise<{ events: Indexed
+       result.items.map((f) => toEvent(f, TOURS[index].toUpperCase())),
+     ).filter((e) => e._hay.length > 1);
+ 
++    const complete = tours.every((tour) => tour.complete);
+     // Só cacheia carga completa: evita fixar resultado parcial (ex.: página 1 após 429),
+     // que deixaria jogadores de páginas seguintes sumidos pelo resto da sessão.
+-    if (events.length > 0 && tours.every((tour) => tour.complete)) fixturesCache.set(key, events);
+-    const quotaLimited = tours.some((tour) => tour.quotaLimited && !tour.complete);
+-    return { events, quotaLimited };
++    if (events.length > 0 && complete) fixturesCache.set(key, events);
++    return { events, complete };
+   })();
+ 
+   inflight.set(key, job);
+@@ -145,29 +158,31 @@ async function loadWindow(start: string, end: string): Promise<{ events: Indexed
+   }
+ }
+ 
+-// Sinaliza que o Matchstat (primário) falhou por cota (429) durante a última
+-// janela. Usado pela UI para distinguir "nenhum evento" de "fonte limitada".
+-export const tennisQuotaLimited = { value: false };
+-
+ // ---- Fallback Flashscore4 --------------------------------------------------
+ // Cadeia search → results/fixtures via proxy (modo provider:"flashscore").
+-// Usado só quando o Matchstat falha por cota (429). Cada busca = ~2 req (search +
+-// results) ou ~3 com fixtures; cota Flashscore é 500/mês, então usar só como
+-// fallback pontual. Função PURA de I/O não é — depende do supabase.functions.
++// Usado só quando o Matchstat falha (429/erro/timeout). Cada busca = ~2 req
++// (search + results) ou ~3 com fixtures; cota Flashscore é 500/mês, então usar
++// só como fallback pontual. Função PURA de I/O não é — depende do supabase.functions.
+ 
+ async function fsFetch(path: string): Promise<{ ok: boolean; status: number; body: unknown }> {
+   const response = await supabase.functions.invoke("tennis-fixtures", {
+     body: { provider: "flashscore", path },
+   });
+   if (response.error) return { ok: false, status: 502, body: null };
+-  return (response.data as { ok?: boolean; status?: number; body?: unknown }) ?? { ok: false, status: 502, body: null };
++  const data = response.data as Envelope;
++  return { ok: data?.ok ?? false, status: data?.status ?? 502, body: data?.body ?? null };
+ }
+ 
++// Teto de jogadores candidatos vindos do search. 3 (e não 5): cada candidato
++// custa 2 requests da cota mensal de 500; o jogador certo quase sempre está
++// entre os 3 primeiros por relevância do próprio Flashscore.
++const FS_MAX_PLAYERS = 3;
++
+ async function searchTennisFlashscore(query: string): Promise<SportEvent[]> {
+   const q = normText(query);
+   const search = await fsFetch(`/api/flashscore/v2/general/search?q=${encodeURIComponent(query)}`);
+   if (!search.ok) return [];
+-  const ids = tennisPlayerIdsFromSearch(search.body).slice(0, 5);
++  const ids = tennisPlayerIdsFromSearch(search.body).slice(0, FS_MAX_PLAYERS);
+   if (ids.length === 0) return [];
+ 
+   // O Flashscore devolve nomes ABREVIADOS ("Jade D."), então a heurística de
+@@ -224,18 +239,16 @@ export async function searchTennisMatches(
+     .map(({ _hay, ...ev }) => ev);
+ 
+   // Circuit breaker: se o Matchstat já devolveu 429 recentemente (cota diária),
+-  // NÃO refaz os 6 tours × 3 retries (~9s) — vai direto ao fallback. Isso mantém
+-  // responsivas TODAS as buscas, inclusive futebol/MMA que chamam o tênis como
+-  // fonte secundária. Passado o cooldown, o fluxo normal volta a tentar o primário.
++  // vai direto ao fallback sem tocar o primário. Isso mantém responsivas TODAS
++  // as buscas, inclusive futebol/MMA que chamam o tênis como fonte secundária.
++  // Passado o cooldown, o fluxo normal volta a tentar o primário.
+   if (matchstatBlocked()) {
+     if (!allowFlashscore) return []; // fonte secundária: não gasta cota do Flashscore
+-    const fs = await searchTennisFlashscore(query);
+-    tennisQuotaLimited.value = fs.length === 0;
+-    return fs;
++    return searchTennisFlashscore(query);
+   }
+ 
+   // Consulta os jogos passados primeiro e só chama a agenda futura quando não
+-  // houver resultado. Assim cobre histórico sem disparar as seis consultas de
++  // houver resultado. Assim cobre histórico sem disparar todas as consultas de
+   // uma vez, o que faz o RapidAPI responder 429.
+   const recent = await loadWindow(
+     fmt(new Date(now.getTime() - 30 * 864e5)),
+@@ -248,14 +261,11 @@ export async function searchTennisMatches(
+   const upcomingMatches = filterAndSort(upcoming.events);
+   if (upcomingMatches.length > 0) return upcomingMatches;
+ 
+-  // Fallback Flashscore4 só quando o primário falhou por cota (429) — preserva a
+-  // cota de 500/mês da fonte secundária. Se também falhar, marca quota limitada
+-  // para a UI diferenciar "nenhum evento" de "fonte temporariamente limitada".
+-  const primaryQuotaLimited = recent.quotaLimited || upcoming.quotaLimited;
+-  if (primaryQuotaLimited && allowFlashscore) {
+-    const fs = await searchTennisFlashscore(query);
+-    if (fs.length > 0) return fs;
++  // Fallback Flashscore4 quando o primário falhou por QUALQUER motivo (429,
++  // timeout, 5xx) — carga completa e vazia é resultado legítimo, não falha,
++  // e não gasta a cota de 500/mês da fonte secundária.
++  if ((!recent.complete || !upcoming.complete) && allowFlashscore) {
++    return searchTennisFlashscore(query);
+   }
+-  tennisQuotaLimited.value = primaryQuotaLimited;
+   return [];
+ }

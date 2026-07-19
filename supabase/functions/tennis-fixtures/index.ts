@@ -79,13 +79,35 @@ Deno.serve(async (req) => {
     return json({ ok: upstream.ok, status: upstream.status, body }, 200);
   }
 
+  // ---- Modo Matchstat allowlisted: board consolidado de próximos jogos.
+  // O prefixo estrito impede que este proxy vire um open proxy para o host.
+  if (typeof params.path === "string" && params.path.startsWith("/tennis/v2/ms-api/upcoming/")) {
+    const url = new URL(`https://${HOST}${params.path}`);
+    if (url.searchParams.get("limit") !== "500" || !/^\d+$/.test(url.searchParams.get("page") ?? "")) {
+      return json({ ok: false, status: 400, body: null, error: "bad params" }, 400);
+    }
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { headers: { "X-RapidAPI-Key": key, "X-RapidAPI-Host": HOST } });
+    } catch (e) {
+      return json({ ok: false, status: 502, body: null, error: `upstream fetch: ${String(e)}` }, 200);
+    }
+    const text = await upstream.text();
+    let body: unknown;
+    try { body = JSON.parse(text); } catch { body = text; }
+    return json({ ok: upstream.ok, status: upstream.status, body }, 200);
+  }
+
   // ---- Modo Matchstat (primário): fixtures por tour/janela.
   const { type, start, end } = params;
   const pageNo = Number(params.pageNo ?? 1);
   const pageSize = Number(params.pageSize ?? 100);
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  // Só atp e wta são tourTypes válidos. "itf" retorna 400 no upstream
+  // (doc: tennisapidoc.matchstat.com/fixtures) — rejeitamos aqui antes de gastar
+  // a chamada. Jogos ITF/Challenger vêm dentro de atp/wta via rankId.
   if (
-    (type !== "atp" && type !== "wta" && type !== "itf") ||
+    (type !== "atp" && type !== "wta") ||
     !dateRe.test(start ?? "") || !dateRe.test(end ?? "") ||
     !Number.isInteger(pageNo) || pageNo < 1 ||
     !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       bankroll_transactions: {
@@ -223,30 +248,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bets_backup_market_swap_20260630: {
-        Row: {
-          created_at: string | null
-          event_name: string | null
-          id: string
-          market: string | null
-          selection: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          event_name?: string | null
-          id: string
-          market?: string | null
-          selection?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          event_name?: string | null
-          id?: string
-          market?: string | null
-          selection?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           bookmakers: string[]
@@ -304,18 +305,90 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_links: {
+        Row: {
+          chat_id: number | null
+          code_expires_at: string | null
+          created_at: string
+          link_code: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_id?: number | null
+          code_expires_at?: string | null
+          created_at?: string
+          link_code?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: number | null
+          code_expires_at?: string | null
+          created_at?: string
+          link_code?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_pending_bets: {
+        Row: {
+          awaiting_correction: boolean
+          chat_id: number
+          created_at: string
+          expires_at: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          awaiting_correction?: boolean
+          chat_id: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          awaiting_correction?: boolean
+          chat_id?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
+      telegram_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      bulk_settle_bets: {
-        Args: { p_updates: Json }
-        Returns: number
+      bulk_settle_bets: { Args: { p_updates: Json }; Returns: number }
+      create_bet_from_telegram: {
+        Args: { p_bet: Json; p_chat_id: number }
+        Returns: string
       }
-      create_bets_with_legs: {
-        Args: { p_bets: Json }
-        Returns: string[]
+      create_bets_with_legs: { Args: { p_bets: Json }; Returns: string[] }
+      get_secret: { Args: { p_name: string }; Returns: string }
+      link_telegram_chat: {
+        Args: { p_chat_id: number; p_code: string }
+        Returns: boolean
       }
       replace_bet_legs: {
         Args: { p_bet_id: string; p_legs: Json }
@@ -453,6 +526,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

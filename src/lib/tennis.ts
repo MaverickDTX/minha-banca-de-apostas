@@ -14,6 +14,10 @@ type TennisFixture = {
   player2?: TennisPlayer;
   tournamentId?: number;
 };
+type TennisBoardMatch = TennisFixture & {
+  type?: string;
+  tournament?: { name?: string; rankId?: number };
+};
 
 const normText = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
@@ -30,18 +34,25 @@ export function matchesTennisQuery(haystack: string, query: string): boolean {
 
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
-type IndexedEvent = SportEvent & { _hay: string };
-type WindowResult = { events: IndexedEvent[]; complete: boolean };
+type IndexedEvent = SportEvent & { _hay: string; _past?: boolean };
+type LoadResult = { events: IndexedEvent[]; complete: boolean };
 // Só cargas COMPLETAS entram no cache, logo todo hit é { complete: true }.
-const fixturesCache = new Map<string, IndexedEvent[]>();
+let tennisIndexCache: IndexedEvent[] | null = null;
+let tennisIndexComplete = false;
 // Dedup de carga em voo: buscas concorrentes (keystrokes) compartilham a mesma
 // paginação em vez de cada uma disparar a cascata de requests em paralelo.
-const inflight = new Map<string, Promise<WindowResult>>();
+let indexInflight: Promise<LoadResult> | null = null;
 
 // Teto de páginas por tour e janela (proteção contra loop). pageSize=100 → até
-// 300 fixtures/tour/janela; mantém o autocomplete responsivo mesmo incluindo ITF.
+// 300 fixtures/tour/janela; mantém o autocomplete responsivo.
 const MAX_PAGES = 3;
-const TOURS = ["atp", "wta", "itf"] as const;
+const MAX_BOARD_PAGES = 4;
+// Apenas atp e wta são tourTypes válidos na API. NÃO existe tour "itf": passar
+// `itf` retorna 400 (doc: tennisapidoc.matchstat.com/fixtures). Jogos ITF/Challenger
+// já vêm dentro de atp/wta (filtráveis por rankId 0/1). Manter "itf" aqui gerava
+// 400 em 1/3 das chamadas e, por marcar a janela como incompleta, disparava o
+// fallback do Flashscore sem necessidade — queimando as duas cotas.
+const TOURS = ["atp", "wta"] as const;
 type Tour = typeof TOURS[number];
 
 // Circuit breaker: quando o Matchstat devolve 429 (cota DIÁRIA), ele seguirá
@@ -102,61 +113,96 @@ async function loadTour(type: Tour, start: string, end: string): Promise<{ items
   return { items: all, complete: true };
 }
 
-async function loadWindow(start: string, end: string): Promise<WindowResult> {
-  const key = `${start}|${end}`;
+export function toEvent(
+  match: TennisFixture,
+  tour?: string,
+  options?: { past?: boolean; tournament?: string },
+): IndexedEvent | null {
+  const p1 = match.player1?.name ?? "";
+  const p2 = match.player2?.name ?? "";
+  if (!p1 || !p2 || p1.includes("/") || p2.includes("/")) return null;
+  const league = (tour ?? "tennis").toUpperCase();
+  return {
+    id: `tennis-${league.toLowerCase()}-${match.id}`,
+    name: `${p1} x ${p2}`,
+    sport: "Tênis",
+    league,
+    date: match.date ? new Date(match.date).toISOString() : null,
+    homeTeam: p1,
+    awayTeam: p2,
+    _past: options?.past,
+    _hay: normText(`${p1} ${p2}`),
+  };
+}
 
-  const cached = fixturesCache.get(key);
-  if (cached) return { events: cached, complete: true };
-
-  const pending = inflight.get(key);
-  if (pending) return pending;
-
-  const job = (async (): Promise<WindowResult> => {
-    // Consultar ATP, WTA e ITF em sequência evita que a primeira digitação
-    // consuma todo o limite de taxa do provedor.
-    const tours: Array<{ items: TennisFixture[]; complete: boolean }> = [];
-    for (const tour of TOURS) {
-      // Breaker consultado POR TOUR: 429 no ATP não deixa WTA/ITF gastarem cota.
-      if (matchstatBlocked()) {
-        tours.push({ items: [], complete: false });
-        continue;
-      }
-      tours.push(await loadTour(tour, start, end));
+export async function loadUpcomingBoard(): Promise<LoadResult> {
+  const events: IndexedEvent[] = [];
+  for (let page = 1; page <= MAX_BOARD_PAGES; page++) {
+    if (matchstatBlocked()) return { events, complete: false };
+    const response = await supabase.functions.invoke("tennis-fixtures", {
+      body: { path: `/tennis/v2/ms-api/upcoming/matches?limit=500&page=${page}` },
+    });
+    const data = response.data as Envelope;
+    if (data?.status === 429) {
+      tripMatchstatBreaker();
+      return { events, complete: false };
     }
+    if (response.error || !data?.ok) return { events, complete: false };
+    const body = data.body as { total?: number; matches?: TennisBoardMatch[] } | null;
+    const matches = Array.isArray(body?.matches) ? body.matches : [];
+    events.push(...matches.map((match) => toEvent(match, match.type, { tournament: match.tournament?.name })).filter(Boolean) as IndexedEvent[]);
+    if (matches.length < 500 || (body?.total !== undefined && events.length >= body.total)) break;
+  }
+  return { events, complete: true };
+}
 
-    const toEvent = (f: TennisFixture, tour: string): IndexedEvent => {
-      const p1 = f.player1?.name ?? "";
-      const p2 = f.player2?.name ?? "";
-      return {
-        id: `tennis-${tour.toLowerCase()}-${f.id}`,
-        name: `${p1} x ${p2}`.trim(),
-        sport: "Tênis",
-        league: tour,
-        date: f.date ? new Date(f.date).toISOString() : null,
-        homeTeam: p1 || undefined,
-        awayTeam: p2 || undefined,
-        _hay: normText(`${p1} ${p2}`),
-      };
-    };
+export async function loadRecentFixtures(): Promise<LoadResult> {
+  const now = new Date();
+  const start = fmt(new Date(now.getTime() - 7 * 864e5));
+  const end = fmt(new Date(now.getTime() - 864e5));
+  const all: IndexedEvent[] = [];
+  let complete = true;
+  for (const tour of TOURS) {
+    if (matchstatBlocked()) {
+      complete = false;
+      continue;
+    }
+    const result = await loadTour(tour, start, end);
+    complete &&= result.complete;
+    all.push(...result.items.map((fixture) => toEvent(fixture, tour, { past: true })).filter(Boolean) as IndexedEvent[]);
+  }
+  return { events: all, complete };
+}
 
-    const events = tours.flatMap((result, index) =>
-      result.items.map((f) => toEvent(f, TOURS[index].toUpperCase())),
-    ).filter((e) => e._hay.length > 1);
-
-    const complete = tours.every((tour) => tour.complete);
-    // Só cacheia carga completa: evita fixar resultado parcial (ex.: página 1 após 429),
-    // que deixaria jogadores de páginas seguintes sumidos pelo resto da sessão.
-    if (events.length > 0 && complete) fixturesCache.set(key, events);
-    return { events, complete };
+export async function loadTennisIndex(): Promise<LoadResult> {
+  if (tennisIndexCache) return { events: tennisIndexCache, complete: tennisIndexComplete };
+  if (indexInflight) return indexInflight;
+  indexInflight = (async () => {
+    const upcoming = await loadUpcomingBoard();
+    const recent = await loadRecentFixtures();
+    const byId = new Map<string, IndexedEvent>();
+    [...upcoming.events, ...recent.events].forEach((event) => {
+      if (!byId.has(event.id)) byId.set(event.id, event);
+    });
+    const result = { events: [...byId.values()], complete: upcoming.complete && recent.complete };
+    if (result.complete) {
+      tennisIndexCache = result.events;
+      tennisIndexComplete = true;
+    }
+    return result;
   })();
-
-  inflight.set(key, job);
   try {
-    return await job;
+    return await indexInflight;
   } finally {
-    inflight.delete(key);
+    indexInflight = null;
   }
 }
+
+export const __resetTennisIndex = () => {
+  tennisIndexCache = null;
+  tennisIndexComplete = false;
+  indexInflight = null;
+};
 
 // ---- Fallback Flashscore4 --------------------------------------------------
 // Cadeia search → results/fixtures via proxy (modo provider:"flashscore").
@@ -231,7 +277,6 @@ export async function searchTennisMatches(
   const allowFlashscore = opts?.allowFlashscore ?? false;
   const q = normText(query);
   if (q.length < 3) return [];
-  const now = new Date();
   const filterAndSort = (fixtures: IndexedEvent[]) => fixtures
     .filter((fixture) => matchesTennisQuery(fixture._hay, q))
     .sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
@@ -247,24 +292,14 @@ export async function searchTennisMatches(
     return searchTennisFlashscore(query);
   }
 
-  // Consulta os jogos passados primeiro e só chama a agenda futura quando não
-  // houver resultado. Assim cobre histórico sem disparar todas as consultas de
-  // uma vez, o que faz o RapidAPI responder 429.
-  const recent = await loadWindow(
-    fmt(new Date(now.getTime() - 30 * 864e5)),
-    fmt(new Date(now.getTime() - 864e5)),
-  );
-  const recentMatches = filterAndSort(recent.events);
-  if (recentMatches.length > 0) return recentMatches;
-
-  const upcoming = await loadWindow(fmt(now), fmt(new Date(now.getTime() + 14 * 864e5)));
-  const upcomingMatches = filterAndSort(upcoming.events);
-  if (upcomingMatches.length > 0) return upcomingMatches;
+  const index = await loadTennisIndex();
+  const matches = filterAndSort(index.events);
+  if (matches.length > 0) return matches;
 
   // Fallback Flashscore4 quando o primário falhou por QUALQUER motivo (429,
   // timeout, 5xx) — carga completa e vazia é resultado legítimo, não falha,
   // e não gasta a cota de 500/mês da fonte secundária.
-  if ((!recent.complete || !upcoming.complete) && allowFlashscore) {
+  if (!index.complete && allowFlashscore) {
     return searchTennisFlashscore(query);
   }
   return [];
