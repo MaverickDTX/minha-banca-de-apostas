@@ -520,6 +520,15 @@ Cada item de `matches[]` (campos usados): `date` (ISO), `type` (`atp`/`wta`),
 > disso (usa `itens == limit`), mas se `hasNextPage`/`total` existir, é o sinal
 > preferível.
 
+> **Shape real confirmado (board.json, 2026-07-19):** o item do board **NÃO tem
+> `id` de partida** — o confronto é identificado pelo par `player1.id`/`player2.id`
+> (a doc sugeria `match.id`, e o guard de id descartava 293/293 em silêncio).
+> `type` vem minúsculo (`"atp"`); `player.odd` vem string; há `rank` top-level
+> além de `tournament.rankId`. Solução: `match_id` sintético NEGATIVO e estável
+> `-(p1.id*1e7 + p2.id)` — negativo para nunca colidir com ids reais (positivos)
+> do histórico de fixtures. Zero colisões nos 172 singles do board de referência
+> (121 doubles filtrados). Aplicado em `tennis-refresh/toRow` e `populate-board.mjs`.
+
 ### 10.2. `loadUpcomingBoard()` — assinatura e lógica
 
 `async function loadUpcomingBoard(): Promise<{ events: IndexedEvent[]; complete: boolean }>`
@@ -573,3 +582,42 @@ fixtures legado (atp/wta) já serve o histórico. Rejeição de `itf` já public
 Persistência do cache (memória vs. cron/Supabase, §9), TTL definitivo, e o
 fallback de 2 etapas via Tennis Stats API (§5.2). Entram na fase 2, com o custo
 real por ciclo já medido.
+
+---
+
+## 11. Lição aprendida — validação obrigatória pós-deploy (2026-07-19)
+
+**Falha:** O primeiro refresh da fase 2 reportou `board.matches=293`, `ok=true`,
+mas **nenhum item do board foi gravado** (`is_past=false` ficou com 0 linhas).
+Causa: `toRow` descartava todos por `tour=""` — o board manda `type: "ATP"`/
+`"WTA"` (maiúsculo) e o código comparava com `"atp"`/`"wta"` (minúsculo). O bug
+ficou oculto porque o `upsert` só incluía o histórico (`is_past=true`).
+
+**Custo:** ~48 chamadas da cota diária (50/dia) gastas em tentativas cegas sem
+verificar o dado real na tabela.
+
+**Regra nova — obrigatória após QUALQUER deploy que escreve no banco:**
+
+1. **Query de verificação imediata** no SQL Editor:
+   ```sql
+   select is_past, count(*) from public.tennis_matches_cache group by is_past;
+   ```
+   Esperado: ambas as categorias > 0 (board + histórico).
+
+2. **Log de rejeição em filtros silenciosos** (`return null`):
+   ```typescript
+   if (tour !== "atp" && tour !== "wta") {
+     console.warn("toRow rejected", { id: m.id, tour, p1, p2 });
+     return null;
+   }
+   ```
+
+3. **Teste de pipeline ponta-a-ponta com amostra real** antes de declarar
+   "pronto": passar um item bruto do probe pelo `toRow` e confirmar que sobrevive.
+
+4. **Não confiar em `ok=true` / `matches=N` do retorno da edge function** —
+   isso só diz que o fetch HTTP funcionou, não que os dados chegaram corretos
+   na tabela.
+
+Essa validação evita gastar cota "no escuro" e garante que o contrato
+API→transform→DB está íntegro.

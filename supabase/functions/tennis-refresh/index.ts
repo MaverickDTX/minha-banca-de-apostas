@@ -66,16 +66,28 @@ const normText = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
 function toRow(m: BoardMatch, tour: string, isPast: boolean, now: string): Row | null {
-  // Itens do feed podem vir sem id (slot vazio, ruido). A coluna match_id é
-  // primary key not-null, então sem id válido o item não é indexável — descarta.
-  if (typeof m.id !== "number" || !Number.isFinite(m.id)) return null;
+  // O board ms-api NÃO traz id de partida (shape real confirmado em board.json,
+  // 2026-07-19 — foi isso que descartava 293/293 itens em silêncio): o confronto
+  // é identificado pelo par de jogadores. Quando m.id existe (fixtures do
+  // histórico), usa o id real; senão sintetiza um match_id NEGATIVO e estável a
+  // partir dos ids dos jogadores — negativo para nunca colidir com os ids reais
+  // (positivos) do histórico.
+  const pid1 = Number(m.player1?.id);
+  const pid2 = Number(m.player2?.id);
+  const realId = Number(m.id);
+  const matchId = Number.isFinite(realId)
+    ? realId
+    : Number.isFinite(pid1) && Number.isFinite(pid2)
+    ? -(pid1 * 10_000_000 + pid2)
+    : NaN;
+  if (!Number.isFinite(matchId)) return null;
   const p1 = m.player1?.name ?? "";
   const p2 = m.player2?.name ?? "";
   // Doubles vêm como "A/B" — fora do índice, como no cliente.
   if (!p1 || !p2 || p1.includes("/") || p2.includes("/")) return null;
   if (tour !== "atp" && tour !== "wta") return null;
   return {
-    match_id: m.id,
+    match_id: matchId,
     tour,
     rank_id: m.tournament?.rankId ?? null,
     starts_at: m.date ? new Date(m.date).toISOString() : null,
@@ -196,7 +208,8 @@ Deno.serve(async (req) => {
     if (r) rows.set(r.match_id, r);
   }
   for (const m of board.matches) {
-    const r = toRow(m, m.type ?? "", false, nowIso);
+    const tour = (m.type ?? "").toLowerCase();
+    const r = toRow(m, tour, false, nowIso);
     if (r) rows.set(r.match_id, r);
   }
 

@@ -47,3 +47,4 @@ HANDOFF.md
 supabase/.temp/
 
 deno.lock
+board.json
