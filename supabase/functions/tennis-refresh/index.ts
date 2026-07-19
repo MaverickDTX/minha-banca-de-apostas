@@ -36,10 +36,11 @@ const json = (payload: unknown, status = 200) =>
 
 type Player = { id?: number; name?: string };
 type BoardMatch = {
-  id: number;
+  // Board ms-api NÃO traz id de partida; fixtures do histórico trazem.
+  id?: number;
   date?: string | null;
   type?: string;
-  tournament?: { name?: string; rankId?: number };
+  tournament?: { id?: number; name?: string; rankId?: number };
   player1?: Player;
   player2?: Player;
 };
@@ -56,6 +57,7 @@ type Row = {
   player2_id: number | null;
   player2_name: string;
   hay: string;
+  is_doubles: boolean;
   is_past: boolean;
   refreshed_at: string;
 };
@@ -65,6 +67,19 @@ type Row = {
 const normText = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
+// FNV-1a 32 bits — id estável para itens SEM player.id (comum em duplas do
+// board). Entrada: hay + torneio (NÃO a data: remarcação mudaria o id e
+// duplicaria a linha no upsert). Mapeado para a faixa -(1e14..~1.000043e14),
+// disjunta da faixa dos singles sintéticos -(p1*1e7+p2) (≤ ~1e13).
+function fnv1a(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
 function toRow(m: BoardMatch, tour: string, isPast: boolean, now: string): Row | null {
   // O board ms-api NÃO traz id de partida (shape real confirmado em board.json,
   // 2026-07-19 — foi isso que descartava 293/293 itens em silêncio): o confronto
@@ -72,31 +87,38 @@ function toRow(m: BoardMatch, tour: string, isPast: boolean, now: string): Row |
   // histórico), usa o id real; senão sintetiza um match_id NEGATIVO e estável a
   // partir dos ids dos jogadores — negativo para nunca colidir com os ids reais
   // (positivos) do histórico.
+  const p1 = m.player1?.name ?? "";
+  const p2 = m.player2?.name ?? "";
+  if (!p1 || !p2) return null;
+  if (tour !== "atp" && tour !== "wta") return null;
+  // Slots-placeholder do feed ("Unknown Player", id-sentinela 3699) são
+  // partidas TBD sem valor no autocomplete — e colidem entre si no id.
+  if (/unknown player/i.test(p1) || /unknown player/i.test(p2)) return null;
+  // Duplas ("A/B" x "C/D") ENTRAM no índice (decisão 2026-07-19); o flag
+  // is_doubles permite à UI diferenciar. No hay, "/" vira espaço para que a
+  // busca por qualquer parceiro individual case por substring.
+  const isDoubles = p1.includes("/") || p2.includes("/");
   const pid1 = Number(m.player1?.id);
   const pid2 = Number(m.player2?.id);
   const realId = Number(m.id);
+  const hay = normText(`${p1.replace(/\//g, " ")} ${p2.replace(/\//g, " ")}`);
   const matchId = Number.isFinite(realId)
     ? realId
     : Number.isFinite(pid1) && Number.isFinite(pid2)
     ? -(pid1 * 10_000_000 + pid2)
-    : NaN;
-  if (!Number.isFinite(matchId)) return null;
-  const p1 = m.player1?.name ?? "";
-  const p2 = m.player2?.name ?? "";
-  // Doubles vêm como "A/B" — fora do índice, como no cliente.
-  if (!p1 || !p2 || p1.includes("/") || p2.includes("/")) return null;
-  if (tour !== "atp" && tour !== "wta") return null;
+    : -(100_000_000_000_000 + fnv1a(`${hay}|${m.tournament?.id ?? ""}`));
   return {
     match_id: matchId,
     tour,
     rank_id: m.tournament?.rankId ?? null,
     starts_at: m.date ? new Date(m.date).toISOString() : null,
     tournament: m.tournament?.name ?? null,
-    player1_id: m.player1?.id ?? null,
+    player1_id: Number.isFinite(pid1) ? pid1 : null,
     player1_name: p1,
-    player2_id: m.player2?.id ?? null,
+    player2_id: Number.isFinite(pid2) ? pid2 : null,
     player2_name: p2,
-    hay: normText(`${p1} ${p2}`),
+    hay,
+    is_doubles: isDoubles,
     is_past: isPast,
     refreshed_at: now,
   };

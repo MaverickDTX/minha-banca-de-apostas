@@ -19,6 +19,13 @@ const HOST = 'tennis-api-atp-wta-itf.p.rapidapi.com';
 
 const normText = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
 
+// FNV-1a 32 bits — id estável para itens sem player.id (duplas do board).
+const fnv1a = (s) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h >>> 0;
+};
+
 async function fetchBoard() {
   const key = process.env.TENNIS_RAPIDAPI_KEY;
   if (!key) { console.error('Defina TENNIS_RAPIDAPI_KEY'); process.exit(1); }
@@ -49,30 +56,39 @@ function toRow(m, nowIso, reasons) {
   // 2026-07-19): o confronto é identificado pelo par de jogadores. Sintetiza um
   // match_id NEGATIVO e estável a partir dos ids dos jogadores — negativo para
   // nunca colidir com os ids reais (positivos) do histórico de fixtures.
+  const p1 = m.player1?.name ?? '';
+  const p2 = m.player2?.name ?? '';
+  if (!p1 || !p2) { reasons.players = (reasons.players ?? 0) + 1; return null; }
+  // Slots-placeholder do feed ("Unknown Player", partidas TBD) — sem valor no
+  // autocomplete e colidem entre si no id.
+  if (/unknown player/i.test(p1) || /unknown player/i.test(p2)) { reasons.tbd = (reasons.tbd ?? 0) + 1; return null; }
+  // Duplas ("A/B") ENTRAM (decisão 2026-07-19). No hay, "/" vira espaço para a
+  // busca por parceiro individual casar por substring.
+  const isDoubles = p1.includes('/') || p2.includes('/');
+  const hay = normText(`${p1.replace(/\//g, ' ')} ${p2.replace(/\//g, ' ')}`);
   const pid1 = Number(m.player1?.id);
   const pid2 = Number(m.player2?.id);
   const realId = Number(m.id);
+  // id: real (histórico) → par de jogadores (singles do board) → hash FNV-1a
+  // (duplas sem player.id). Faixas negativas disjuntas; hash NÃO usa a data
+  // (remarcação duplicaria a linha).
   const id = Number.isFinite(realId)
     ? realId
     : Number.isFinite(pid1) && Number.isFinite(pid2)
     ? -(pid1 * 10_000_000 + pid2)
-    : NaN;
-  if (!Number.isFinite(id)) { reasons.id = (reasons.id ?? 0) + 1; return null; }
-  const p1 = m.player1?.name ?? '';
-  const p2 = m.player2?.name ?? '';
-  if (!p1 || !p2) { reasons.players = (reasons.players ?? 0) + 1; return null; }
-  if (p1.includes('/') || p2.includes('/')) { reasons.doubles = (reasons.doubles ?? 0) + 1; return null; }
+    : -(100_000_000_000_000 + fnv1a(`${hay}|${m.tournament?.id ?? ''}`));
   return {
     match_id: id,
     tour,
     rank_id: m.tournament?.rankId ?? null,
     starts_at: m.date ? new Date(m.date).toISOString() : null,
     tournament: m.tournament?.name ?? null,
-    player1_id: Number(m.player1?.id) || null,
+    player1_id: Number.isFinite(pid1) ? pid1 : null,
     player1_name: p1,
-    player2_id: Number(m.player2?.id) || null,
+    player2_id: Number.isFinite(pid2) ? pid2 : null,
     player2_name: p2,
-    hay: normText(`${p1} ${p2}`),
+    hay,
+    is_doubles: isDoubles,
     is_past: false,
     refreshed_at: nowIso,
   };

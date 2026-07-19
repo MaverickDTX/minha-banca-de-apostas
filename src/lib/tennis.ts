@@ -173,7 +173,11 @@ export function toEvent(
 ): IndexedEvent | null {
   const p1 = match.player1?.name ?? "";
   const p2 = match.player2?.name ?? "";
-  if (!p1 || !p2 || p1.includes("/") || p2.includes("/")) return null;
+  if (!p1 || !p2) return null;
+  // Slots-placeholder do feed ("Unknown Player", partidas TBD) — sem valor.
+  if (/unknown player/i.test(p1) || /unknown player/i.test(p2)) return null;
+  // Duplas ("A/B") entram no índice (decisão 2026-07-19). No _hay o "/" vira
+  // espaço para a busca por parceiro individual casar por substring.
   const league = (tour ?? "tennis").toUpperCase();
   return {
     id: `tennis-${league.toLowerCase()}-${match.id}`,
@@ -184,7 +188,7 @@ export function toEvent(
     homeTeam: p1,
     awayTeam: p2,
     _past: options?.past,
-    _hay: normText(`${p1} ${p2}`),
+    _hay: normText(`${p1.replace(/\//g, " ")} ${p2.replace(/\//g, " ")}`),
   };
 }
 

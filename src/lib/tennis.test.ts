@@ -99,13 +99,17 @@ describe("índice de tênis", () => {
     expect(invoke.mock.calls[1][1].body.path).toContain("page=2");
   });
 
-  it("filtra doubles do índice", async () => {
+  it("inclui doubles no índice, buscável por parceiro individual", async () => {
     invoke
       .mockResolvedValueOnce(board([match(1, "Player A/Player B", "Player C/Player D")]))
       .mockResolvedValueOnce(emptyFixtures())
       .mockResolvedValueOnce(emptyFixtures());
 
-    expect((await loadTennisIndex()).events).toEqual([]);
+    const result = await loadTennisIndex();
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].name).toBe("Player A/Player B x Player C/Player D");
+    // "/" vira espaço no _hay: busca por um único parceiro casa por substring.
+    expect(matchesTennisQuery(result.events[0]._hay, "Player C")).toBe(true);
   });
 
   it("deduplica o mesmo confronto entre board e histórico", async () => {

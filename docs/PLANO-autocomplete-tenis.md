@@ -529,6 +529,16 @@ Cada item de `matches[]` (campos usados): `date` (ISO), `type` (`atp`/`wta`),
 > do histórico de fixtures. Zero colisões nos 172 singles do board de referência
 > (121 doubles filtrados). Aplicado em `tennis-refresh/toRow` e `populate-board.mjs`.
 
+> **Duplas incluídas (decisão do usuário, 2026-07-19).** Doubles ("A/B" x "C/D")
+> deixam de ser descartados: entram com `is_doubles=true` (coluna nova, migration
+> `20260720100000`). No `hay`/`_hay` o "/" vira espaço → busca por parceiro
+> individual casa por substring, sem tocar `matchesTennisQuery`. Id: quando falta
+> `player.id`, hash FNV-1a de `hay|tournament.id` na faixa `-(1e14+…)`, disjunta
+> da faixa dos singles. **Guard adicional**: slots-placeholder "Unknown Player"
+> (partidas TBD, id-sentinela 3699 que colide entre si) são descartados.
+> Validado no board de referência: 254 válidos (172 singles + 82 duplas), 39 TBD
+> fora, zero colisões. Custo de cota: zero (duplas já vinham nas mesmas chamadas).
+
 ### 10.2. `loadUpcomingBoard()` — assinatura e lógica
 
 `async function loadUpcomingBoard(): Promise<{ events: IndexedEvent[]; complete: boolean }>`

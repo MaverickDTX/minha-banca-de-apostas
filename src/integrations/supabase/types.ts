@@ -377,6 +377,7 @@ export type Database = {
       tennis_matches_cache: {
         Row: {
           hay: string
+          is_doubles: boolean
           is_past: boolean
           match_id: number
           player1_id: number | null
@@ -391,6 +392,7 @@ export type Database = {
         }
         Insert: {
           hay: string
+          is_doubles?: boolean
           is_past?: boolean
           match_id: number
           player1_id?: number | null
@@ -405,6 +407,7 @@ export type Database = {
         }
         Update: {
           hay?: string
+          is_doubles?: boolean
           is_past?: boolean
           match_id?: number
           player1_id?: number | null
