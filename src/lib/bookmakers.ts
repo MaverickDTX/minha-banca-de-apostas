@@ -32,6 +32,7 @@ export const BOOKMAKERS: BookmakerDef[] = [
   { slug: "pinnacle",       name: "Pinnacle",        monogram: "PN",   bg: "0 78% 46%",   fg: "0 0% 100%",    domain: "pinnacle.com" },
   { slug: "betmgm",         name: "BetMGM",          monogram: "MGM",  bg: "44 90% 50%",  fg: "0 0% 8%",      domain: "betmgm.com" },
   { slug: "esportivabet",   name: "Esportiva.bet",   monogram: "EV",   bg: "208 88% 44%", fg: "0 0% 100%",    domain: "esportivabet.com.br" },
+  { slug: "pitaco",         name: "Pitaco",          monogram: "PT",   bg: "271 82% 48%", fg: "0 0% 100%",    domain: "pitaco.bet.br" },
 ];
 
 const BY_NAME = new Map(BOOKMAKERS.map((b) => [b.name.toLowerCase(), b]));
