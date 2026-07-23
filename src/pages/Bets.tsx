@@ -25,6 +25,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { SPORT_NONE } from "@/lib/analyticsUrl";
 
 const ODDS_BUCKETS: { value: string; label: string; test: (odds: number) => boolean }[] = [
   { value: "lt15", label: "< 1.50", test: (o) => o < 1.5 },
@@ -177,6 +178,7 @@ export default function Bets() {
     days == null ? !dateStart && !dateEnd : dateStart === localISO(days) && !dateEnd;
 
   const sports = useMemo(() => Array.from(new Set(bets.map((b) => b.sport).filter(Boolean) as string[])), [bets]);
+  const hasSportless = useMemo(() => bets.some((b) => !b.sport || !b.sport.trim()), [bets]);
   const books = useMemo(() => Array.from(new Set(bets.map((b) => b.bookmaker).filter(Boolean) as string[])), [bets]);
   const tipsters = useMemo(() => Array.from(new Set(bets.map((b) => b.tipster).filter(Boolean) as string[])), [bets]);
 
@@ -187,7 +189,9 @@ export default function Bets() {
     const bucket = ODDS_BUCKETS.find((b) => b.value === oddsBucket);
     return bets.filter((b) => {
       if (status !== "all" && b.status !== status) return false;
-      if (sport !== "all" && b.sport !== sport) return false;
+      if (sport === SPORT_NONE) {
+        if (b.sport && b.sport.trim()) return false;
+      } else if (sport !== "all" && b.sport !== sport) return false;
       if (bookmaker !== "all" && b.bookmaker !== bookmaker) return false;
       if (betType !== "all" && b.bet_type !== betType) return false;
       if (tipster !== "all" && b.tipster !== tipster) return false;
@@ -310,6 +314,7 @@ export default function Bets() {
           <SelectTrigger className="w-auto min-w-[140px]"><SelectValue placeholder="Esporte" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos esportes</SelectItem>
+            {hasSportless && <SelectItem value={SPORT_NONE}>Sem esporte</SelectItem>}
             {sports.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>

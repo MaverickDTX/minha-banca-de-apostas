@@ -3,10 +3,12 @@ import type { Bet } from "@/hooks/useBets";
 import {
   betMatchesGroup,
   buildAnalyticsUrl,
+  buildBetsUrlForGroup,
   currentMonthRange,
   getBetGroupKey,
   parseAnalyticsTab,
   presetStartDate,
+  SPORT_NONE,
 } from "./analyticsUrl";
 
 const baseBet = {
@@ -89,6 +91,36 @@ describe("getBetGroupKey / betMatchesGroup", () => {
   it("agrupa mês YYYY-MM", () => {
     expect(getBetGroupKey(baseBet, "mes")).toBe("2026-06");
     expect(betMatchesGroup(baseBet, "mes", "2026-06")).toBe(true);
+  });
+});
+
+describe("buildBetsUrlForGroup", () => {
+  it("esporte vira filtro sport, e — vira sentinela sem esporte", () => {
+    expect(buildBetsUrlForGroup("esporte", "Futebol")).toBe("/apostas?sport=Futebol");
+    expect(buildBetsUrlForGroup("esporte", "—")).toBe(`/apostas?sport=${SPORT_NONE}`);
+  });
+
+  it("casa/tipster usam filtro dedicado; — não é clicável", () => {
+    expect(buildBetsUrlForGroup("casa", "Bet365")).toBe("/apostas?bookmaker=Bet365");
+    expect(buildBetsUrlForGroup("tipster", "João")).toBe("/apostas?tipster=Jo%C3%A3o");
+    expect(buildBetsUrlForGroup("casa", "—")).toBeNull();
+    expect(buildBetsUrlForGroup("tipster", "—")).toBeNull();
+  });
+
+  it("liga/mercado/tag caem na busca livre (q)", () => {
+    expect(buildBetsUrlForGroup("liga", "Brasileirão")).toBe("/apostas?q=Brasileir%C3%A3o");
+    expect(buildBetsUrlForGroup("mercado", "Over 2.5")).toBe("/apostas?q=Over+2.5");
+  });
+
+  it("tipo mapeia para o filtro de tipo", () => {
+    expect(buildBetsUrlForGroup("tipo", "multipla")).toBe("/apostas?type=multipla");
+  });
+
+  it("dimensões sem equivalente retornam null", () => {
+    expect(buildBetsUrlForGroup("odds", "1.80–2.09")).toBeNull();
+    expect(buildBetsUrlForGroup("dia", "Seg")).toBeNull();
+    expect(buildBetsUrlForGroup("mes", "2026-07")).toBeNull();
+    expect(buildBetsUrlForGroup("timing", "pre-live")).toBeNull();
   });
 });
 

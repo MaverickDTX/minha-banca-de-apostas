@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { useBets } from "@/hooks/useBets";
 import { useProfile } from "@/hooks/useProfile";
@@ -9,6 +9,7 @@ import { CountUp } from "@/components/CountUp";
 import {
   analyticsTabLabel,
   betMatchesGroup,
+  buildBetsUrlForGroup,
   currentMonthRange,
   parseAnalyticsPreset,
   parseAnalyticsTab,
@@ -361,17 +362,17 @@ export default function Analytics() {
             <TabsTrigger value="timing">Pré × Live</TabsTrigger>
             <TabsTrigger value="tipo">Simples × Múltiplas</TabsTrigger>
           </TabsList>
-          <TabsContent value="esporte"><GroupTable rows={bySport} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="liga"><GroupTable rows={byLeague} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="mercado"><GroupTable rows={byMarket} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="casa"><GroupTable rows={byBook} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="odds"><GroupTable rows={byOdds} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="dia"><GroupTable rows={byDay} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="mes"><GroupTable rows={byMonth} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="tag"><GroupTable rows={byTag} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="tipster"><GroupTable rows={byTipster} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="timing"><GroupTable rows={byTiming} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
-          <TabsContent value="tipo"><GroupTable rows={byType} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="esporte"><GroupTable tab="esporte" rows={bySport} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="liga"><GroupTable tab="liga" rows={byLeague} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="mercado"><GroupTable tab="mercado" rows={byMarket} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="casa"><GroupTable tab="casa" rows={byBook} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="odds"><GroupTable tab="odds" rows={byOdds} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="dia"><GroupTable tab="dia" rows={byDay} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="mes"><GroupTable tab="mes" rows={byMonth} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tag"><GroupTable tab="tag" rows={byTag} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tipster"><GroupTable tab="tipster" rows={byTipster} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="timing"><GroupTable tab="timing" rows={byTiming} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
+          <TabsContent value="tipo"><GroupTable tab="tipo" rows={byType} currency={currency} unitValue={profile?.unit_value} highlightKey={group} /></TabsContent>
         </Tabs>
       </motion.div>
     </div>
@@ -379,16 +380,19 @@ export default function Analytics() {
 }
 
 function GroupTable({
+  tab,
   rows,
   currency,
   unitValue,
   highlightKey,
 }: {
+  tab: AnalyticsTab;
   rows: { key: string; metrics: ReturnType<typeof computeMetrics> }[];
   currency: string;
   unitValue?: number;
   highlightKey?: string;
 }) {
+  const navigate = useNavigate();
   return (
     <div className="surface overflow-x-auto mt-3">
       <Table>
@@ -414,12 +418,33 @@ function GroupTable({
               <TableCell colSpan={12} className="text-center text-muted-foreground py-6">Sem dados.</TableCell>
             </TableRow>
           )}
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const href = buildBetsUrlForGroup(tab, r.key);
+            return (
             <TableRow
               key={r.key}
-              className={cn(highlightKey && r.key === highlightKey && "bg-primary/10")}
+              className={cn(
+                highlightKey && r.key === highlightKey && "bg-primary/10",
+                href && "cursor-pointer hover:bg-muted/50 transition-colors",
+              )}
+              {...(href
+                ? {
+                    role: "link",
+                    tabIndex: 0,
+                    title: "Ver apostas deste grupo",
+                    onClick: () => navigate(href),
+                    onKeyDown: (e: ReactKeyboardEvent) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate(href);
+                      }
+                    },
+                  }
+                : {})}
             >
-              <TableCell className="font-medium">{r.key}</TableCell>
+              <TableCell className="font-medium">
+                <span className={cn(href && "underline decoration-dotted underline-offset-4")}>{r.key}</span>
+              </TableCell>
               <TableCell className="text-right">{r.metrics.totalBets}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(r.metrics.stakeTotal, currency, unitValue)}</TableCell>
               <TableCell className={`text-right font-mono ${r.metrics.netProfit > 0 ? "positive" : r.metrics.netProfit < 0 ? "negative" : ""}`}>
@@ -436,7 +461,8 @@ function GroupTable({
               <TableCell className="text-right font-mono positive">{formatCurrency(r.metrics.bestGreen, currency, unitValue)}</TableCell>
               <TableCell className="text-right font-mono negative">{formatCurrency(r.metrics.worstRed, currency, unitValue)}</TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

@@ -66,6 +66,49 @@ export function betMatchesGroup(bet: Bet, tab: AnalyticsTab, group: string): boo
   return getBetGroupKey(bet, tab) === group;
 }
 
+/** Sentinela usada no filtro de esporte de /apostas para "sem esporte" (campo vazio). */
+export const SPORT_NONE = "__none__";
+
+/** Chave de grupo vazia nas tabelas de Análises. */
+export const EMPTY_GROUP_KEY = "—";
+
+/**
+ * Monta a URL de /apostas com o filtro correspondente à linha clicada nas Análises.
+ * Retorna null quando a dimensão não tem filtro equivalente na página Apostas
+ * (nesses casos a linha não é clicável).
+ */
+export function buildBetsUrlForGroup(tab: AnalyticsTab, key: string): string | null {
+  const sp = new URLSearchParams();
+  switch (tab) {
+    case "esporte":
+      sp.set("sport", key === EMPTY_GROUP_KEY ? SPORT_NONE : key);
+      break;
+    case "casa":
+      if (key === EMPTY_GROUP_KEY) return null;
+      sp.set("bookmaker", key);
+      break;
+    case "tipster":
+      if (key === EMPTY_GROUP_KEY) return null;
+      sp.set("tipster", key);
+      break;
+    case "tipo":
+      sp.set("type", key);
+      break;
+    case "liga":
+    case "mercado":
+    case "tag":
+      // Apostas não tem filtro dedicado; usa a busca livre (cobre liga/mercado/tags).
+      if (key === EMPTY_GROUP_KEY) return null;
+      sp.set("q", key);
+      break;
+    default:
+      // odds, dia, mes, timing: sem equivalente em /apostas.
+      return null;
+  }
+  const qs = sp.toString();
+  return qs ? `/apostas?${qs}` : null;
+}
+
 export function parseAnalyticsTab(value: string | null): AnalyticsTab {
   if (value && (ANALYTICS_TABS as readonly string[]).includes(value)) {
     return value as AnalyticsTab;
