@@ -49,6 +49,7 @@ const MARKETS_BY_SPORT: Record<string, string[]> = {
     "Vencedor da Partida",
     "Vencedor do 1º Set",
     "Total de Games",
+    "Total de Games 1º Set",
     "Handicap de Games",
     "Total de Sets",
     "Placar de Sets",
