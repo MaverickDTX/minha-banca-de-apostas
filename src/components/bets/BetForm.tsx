@@ -387,19 +387,17 @@ export function BetForm({
                 </Tooltip>
               </div>
             )}
-            {!isMultiple && (
-              <div className="flex items-center space-x-2 self-end pb-2">
-                <Switch
-                  checked={is_free_bet}
-                  onCheckedChange={setIsFreeBet}
-                  className="data-[state=checked]:bg-emerald-500"
-                  id="free-bet"
-                />
-                <Label htmlFor="free-bet" className="text-xs text-muted-foreground cursor-pointer">
-                  Free bet (aposta grátis)
-                </Label>
-              </div>
-            )}
+            <div className="flex items-center space-x-2 self-end pb-2">
+              <Switch
+                checked={is_free_bet}
+                onCheckedChange={setIsFreeBet}
+                className="data-[state=checked]:bg-emerald-500"
+                id="free-bet"
+              />
+              <Label htmlFor="free-bet" className="text-xs text-muted-foreground cursor-pointer">
+                Free bet (aposta grátis)
+              </Label>
+            </div>
           </div>
 
           {isMultiple && (
