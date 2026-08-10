@@ -207,8 +207,15 @@ export async function loadUpcomingBoard(): Promise<LoadResult> {
     if (response.error || !data?.ok) return { events, complete: false };
     const body = data.body as { total?: number; matches?: TennisBoardMatch[] } | null;
     const matches = Array.isArray(body?.matches) ? body.matches : [];
+    // Para quando a página vem vazia — NÃO usar `matches.length < 500` nem
+    // `total` do corpo: confirmado em 2026-08-10 que este endpoint devolve
+    // páginas de ~200 itens mesmo com limit=500, sem hasNextPage, e `total`
+    // reflete a página atual, não o total geral. Esse corte errado fazia o
+    // board parar sempre na página 1, perdendo torneios inteiros (WTA Toronto
+    // rankId 3 só aparecia na página 2) sem gerar nenhum erro — a carga era
+    // marcada "completa" e o autocomplete ficava mudo pro torneio ausente.
+    if (matches.length === 0) break;
     events.push(...matches.map((match) => toEvent(match, match.type, { tournament: match.tournament?.name })).filter(Boolean) as IndexedEvent[]);
-    if (matches.length < 500 || (body?.total !== undefined && events.length >= body.total)) break;
   }
   return { events, complete: true };
 }

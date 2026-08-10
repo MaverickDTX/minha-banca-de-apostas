@@ -136,7 +136,14 @@ async function rapid(path: string, key: string): Promise<{ status: number; body:
   }
 }
 
-// Board consolidado ATP+WTA. Paginação por saturação (== BOARD_LIMIT itens).
+// Board consolidado ATP+WTA. Paginação: para quando a página vem vazia.
+// NÃO usar `matches.length < BOARD_LIMIT` nem o `total` do corpo como sinal de
+// fim — confirmado em 2026-08-10 que este endpoint devolve páginas de ~200
+// itens mesmo com limit=500, e `total` reflete a contagem DAQUELA página, não
+// o total geral (sem hasNextPage, ao contrário do endpoint de fixtures). Usar
+// esse corte fazia o board parar sempre na página 1, perdendo qualquer coisa
+// nas páginas seguintes — foi assim que o WTA Toronto (rankId 3, page 2)
+// sumiu do autocomplete com o board "completo" e sem nenhum erro.
 async function fetchBoard(key: string): Promise<{ matches: BoardMatch[]; ok: boolean; calls: number }> {
   const all: BoardMatch[] = [];
   let calls = 0;
@@ -149,8 +156,8 @@ async function fetchBoard(key: string): Promise<{ matches: BoardMatch[]; ok: boo
     if (status !== 200) return { matches: all, ok: false, calls };
     const b = body as { total?: number; matches?: BoardMatch[] } | null;
     const matches = Array.isArray(b?.matches) ? b.matches : [];
+    if (matches.length === 0) break;
     all.push(...matches);
-    if (matches.length < BOARD_LIMIT || (b?.total !== undefined && all.length >= b.total)) break;
   }
   return { matches: all, ok: true, calls };
 }

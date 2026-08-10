@@ -143,6 +143,72 @@ async function main() {
     ? "✓ há jogos ITF/Challenger no feed"
     : "○ amostra sem ITF/Challenger — ampliar amostra (limit maior) antes de concluir"}`);
 
+  // ── Teste 5: torneio/confronto específico ausente no autocomplete ───────────
+  // Uso: TENNIS_PROBE_TOUR=wta TENNIS_PROBE_DATE=2026-08-10 TENNIS_PROBE_QUERY="shnaider swiatek" node scripts/probe-tennis-api.mjs
+  // Isola se a lacuna é (a) do board ms-api/upcoming (nosso cache), (b) do
+  // torneio inteiro na origem, ou (c) só de um confronto pontual — usando o
+  // endpoint CORE /fixtures/{tour}/{date}, que expõe hasNextPage de verdade
+  // (ao contrário do ms-api/upcoming, cujo paginação por `total` é enganosa —
+  // ver nota em supabase/functions/tennis-refresh/index.ts, fetchBoard).
+  const probeTour = process.env.TENNIS_PROBE_TOUR;
+  const probeDate = process.env.TENNIS_PROBE_DATE;
+  const probeQuery = process.env.TENNIS_PROBE_QUERY?.toLowerCase();
+  if (probeTour && probeDate) {
+    line(`\n[5] Diagnóstico dirigido: ${probeTour} / ${probeDate}${probeQuery ? ` / query="${probeQuery}"` : ""}`);
+    if (!["atp", "wta"].includes(probeTour)) {
+      line(`    ✗ TENNIS_PROBE_TOUR deve ser 'atp' ou 'wta' (recebido: '${probeTour}')`);
+    } else {
+      let page = 1;
+      let hasNext = true;
+      const all = [];
+      while (hasNext && page <= 5) {
+        const r5 = await call(`/tennis/v2/${probeTour}/fixtures/${probeDate}?include=tournament&pageSize=100&pageNo=${page}`);
+        if (r5.status !== 200) {
+          line(`    ✗ HTTP ${r5.status} na página ${page} — abortando diagnóstico dirigido`);
+          break;
+        }
+        const items = Array.isArray(r5.body?.data) ? r5.body.data : [];
+        all.push(...items);
+        hasNext = r5.body?.hasNextPage === true;
+        page++;
+        await sleep(300);
+      }
+      line(`    total de fixtures no dia (${probeTour}): ${all.length}`);
+
+      const tournaments = new Map();
+      for (const m of all) {
+        const t = m?.tournament;
+        if (!t) continue;
+        tournaments.set(t.id, `${t.name} (rankId ${t.rankId})`);
+      }
+      line(`    torneios presentes: ${[...tournaments.values()].join(" | ") || "(nenhum)"}`);
+
+      if (probeQuery) {
+        const terms = probeQuery.split(/\s+(?:x|vs\.?)\s+/i).filter(Boolean);
+        const norm = (s) => (s ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+        const hit = all.find((m) => {
+          const hay = norm(`${m?.player1?.name} ${m?.player2?.name}`);
+          return terms.every((t) => hay.includes(norm(t)));
+        });
+        if (hit) {
+          line(`    ✓ CONFRONTO ENCONTRADO na origem: ${hit.player1?.name} x ${hit.player2?.name}`);
+          line(`      torneio: ${hit.tournament?.name} | data: ${hit.date} | roundId: ${hit.roundId}`);
+          line(`      veredito: o dado EXISTE no endpoint core — se sumiu do autocomplete,`);
+          line(`      o bug está no NOSSO pipeline (board ms-api/upcoming ou cache), não na origem.`);
+        } else {
+          const tourHit = [...tournaments.values()].some((v) => terms.some((t) => v.toLowerCase().includes(t)));
+          line(`    ✗ confronto NÃO encontrado no endpoint core para ${probeDate}`);
+          line(`      veredito: ${tourHit
+            ? "o torneio está listado, mas ESTE confronto específico ainda não foi publicado pela Matchstat — lacuna pontual da origem, não é bug nosso."
+            : "nem o torneio aparece nesta data — re-probe outra data (fase de grupos/qualifying pode cair em dia adjacente) antes de concluir que é lacuna da origem."}`);
+        }
+      }
+    }
+  } else {
+    line("\n[5] (pulado) Defina TENNIS_PROBE_TOUR + TENNIS_PROBE_DATE (e opcionalmente");
+    line("    TENNIS_PROBE_QUERY=\"jogador1 x jogador2\") para diagnosticar um confronto específico ausente.");
+  }
+
   hr();
   line("Fim. Cole a saída de volta na conversa para eu fechar o desenho.\n");
 }
