@@ -15,7 +15,9 @@ function headers(): HeadersInit {
 type ApiTeam = { id: number; name: string };
 type ApiFixture = {
   fixture: { id: number; date: string };
-  league: { name: string };
+  // `country` já vem nesta mesma resposta e é indispensável: a API nomeia tanto
+  // o Brasileirão quanto a liga italiana e a equatoriana como "Serie A".
+  league: { name: string; country?: string };
   teams: { home: ApiTeam; away: ApiTeam };
 };
 
@@ -27,7 +29,7 @@ function normalize(f: ApiFixture): SportEvent {
     id: `api-sports-${f.fixture.id}`,
     name: translateEventName(rawName, f.teams.home.name, f.teams.away.name),
     sport: "Soccer",
-    league: translateLeague(f.league.name),
+    league: translateLeague(f.league.name, f.league.country),
     date: new Date(f.fixture.date).toISOString(),
     homeTeam: home,
     awayTeam: away,

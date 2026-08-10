@@ -42,7 +42,7 @@ type V1Game = {
   id: number;
   date: string;
   teams: { home: V1Team; away: V1Team };
-  league?: { name?: string };
+  league?: { name?: string; country?: string };
 };
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ async function searchV1TeamSport(
           id: `apisports-${host.split(".")[1]}-${g.id}`,
           name: translateEventName(rawName, g.teams.home.name, g.teams.away.name),
           sport,
-          league: translateLeague(g.league?.name ?? ""),
+          league: translateLeague(g.league?.name ?? "", g.league?.country),
           date: new Date(g.date).toISOString(),
           homeTeam: home,
           awayTeam: away,

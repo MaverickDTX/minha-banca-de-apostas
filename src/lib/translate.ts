@@ -39,23 +39,91 @@ const TEAMS: Record<string, string> = {
   "United Arab Emirates": "Emirados Árabes Unidos", "Israel": "Israel",
 };
 
+// Ligas cujo nome NÃO é único no mundo: "Serie A" existe no Brasil, na Itália e
+// no Equador. Resolver por PAÍS, e sempre ANTES da lista genérica.
+//
+// Era exatamente aqui que o Brasileirão se perdia: a lista abaixo tinha um
+// `[/Serie A/i, "Serie A"]` que, por ser first-match-wins, engolia
+// "Brazilian Serie A" e devolvia "Serie A" — o mesmo rótulo da liga italiana.
+// Resultado: Brasileirão e Serie A italiana caíam na MESMA chave de agrupamento
+// do Analytics, e "Brazilian Serie B"/"C" ficavam sem tradução nenhuma.
+//
+// O país vem do campo `country` da API quando existe; quando não vem, o próprio
+// nome costuma trazê-lo ("Brazilian Serie A", "Ecuadorian Serie A"), então a
+// checagem roda sobre `country + league`.
+const BY_COUNTRY: Array<{ country: RegExp; league: RegExp; pt: (m: RegExpMatchArray) => string }> = [
+  {
+    country: /brazil|brasil/i,
+    // \b após a divisão evita capturar "Série A1"/"A2" dos estaduais.
+    league: /s[ée]rie\s*([abcd])\b/i,
+    pt: (m) => `Brasileirão Série ${m[1].toUpperCase()}`,
+  },
+  {
+    country: /ecuador|equador/i,
+    league: /s[ée]rie\s*a\b/i,
+    pt: () => "Serie A (Equador)",
+  },
+];
+
+// ATENÇÃO: first-match-wins. Regras mais específicas vêm primeiro — eliminatórias
+// antes do torneio principal, "K League 2" antes de "K League".
 const LEAGUES: Array<[RegExp, string]> = [
+  // Seleções e competições internacionais
   [/FIFA World Cup Qualifiers?/i, "Eliminatórias da Copa do Mundo"],
+  [/FIFA Club World Cup|Club World Cup/i, "Mundial de Clubes"],
+  [/FIFA World Cup|World Cup/i, "Copa do Mundo"],
   [/UEFA European Championship Qualif(ying|iers?)/i, "Eliminatórias da Eurocopa"],
   [/UEFA European Championship/i, "Eurocopa"],
   [/UEFA Nations League/i, "Liga das Nações"],
   [/UEFA Champions League/i, "Liga dos Campeões"],
   [/UEFA Europa League/i, "Liga Europa"],
-  [/UEFA Europa Conference League/i, "Liga Conferência"],
+  // A competição foi renomeada de "UEFA Europa Conference League" para
+  // "UEFA Conference League" — a regex antiga exigia o "Europa" e por isso
+  // deixava o nome atual sem tradução.
+  [/UEFA (Europa )?Conference League/i, "Liga Conferência"],
+  [/UEFA Super Cup/i, "Supercopa da UEFA"],
   [/Copa America/i, "Copa América"],
   [/Copa Libertadores/i, "Copa Libertadores"],
+  [/Recopa Sudamericana/i, "Recopa Sul-Americana"],
   [/Copa Sudamericana/i, "Copa Sul-Americana"],
   [/Friendl(y|ies)/i, "Amistoso"],
+
+  // Américas
+  [/Argentina Torneo Federal A/i, "Torneo Federal A (Argentina)"],
+  [/Argentinian Primera Division|Argentina Primera Division/i, "Campeonato Argentino"],
+  [/MLS Next Pro/i, "MLS Next Pro"],
+  [/American Major League Soccer|Major League Soccer/i, "MLS"],
+  [/Mexican Primera League|Liga MX/i, "Campeonato Mexicano"],
+  [/Uruguayan Primera Division/i, "Campeonato Uruguaio"],
+  [/Peruvian Primera Division/i, "Campeonato Peruano"],
+  [/Chilean Primera Division/i, "Campeonato Chileno"],
+  [/Colombian? Categor[ií]a Primera A/i, "Categoría Primera A (Colômbia)"],
+
+  // Europa — nome próprio permanece; o qualificador de país vira sufixo.
   [/Premier League/i, "Premier League"],
   [/La Liga/i, "La Liga"],
-  [/Serie A/i, "Serie A"],
   [/Bundesliga/i, "Bundesliga"],
   [/Ligue 1/i, "Ligue 1"],
+  [/Eredivisie/i, "Eredivisie"],
+  [/Primeira Liga/i, "Primeira Liga"],
+  [/Swedish Allsvenskan/i, "Allsvenskan (Suécia)"],
+  [/Norwegian Eliteserien/i, "Eliteserien (Noruega)"],
+  [/Norwegian 1\.? Divisjon/i, "1. Divisjon (Noruega)"],
+  [/Polish Ekstraklasa/i, "Ekstraklasa (Polônia)"],
+  [/Polish I liga/i, "I liga (Polônia)"],
+  [/Slovenian 1\.? SNL/i, "1. SNL (Eslovênia)"],
+  [/Swiss Super League/i, "Super League (Suíça)"],
+  [/Danish Superliga/i, "Superliga (Dinamarca)"],
+  [/Bulgarian First League/i, "Campeonato Búlgaro"],
+
+  // Ásia
+  [/South Korean K League 2|K League 2/i, "K League 2 (Coreia do Sul)"],
+  [/South Korean K League 1?|K League 1/i, "K League 1 (Coreia do Sul)"],
+
+  // Itália — só chega aqui o que BY_COUNTRY já descartou como Brasil/Equador.
+  // Ancorado para não reescrever nomes compostos de outros países.
+  [/Italian Serie A|^Serie A$/i, "Serie A"],
+  [/Italian Serie B|^Serie B$/i, "Serie B"],
 ];
 
 function translateTeam(name: string): string {
@@ -74,9 +142,25 @@ export function translateEventName(name: string, home?: string, away?: string): 
   return name;
 }
 
-export function translateLeague(league: string): string {
-  for (const [re, pt] of LEAGUES) if (re.test(league)) return pt;
-  return league;
+/**
+ * Traduz o nome da liga para PT-BR.
+ *
+ * `country` é opcional e vem do campo homônimo da API quando disponível. É o
+ * que permite distinguir "Serie A" do Brasil, da Itália e do Equador — sem ele,
+ * um "Serie A" cru fica como está (ambíguo) em vez de virar Brasileirão errado.
+ * Idempotente: rodar de novo sobre um nome já traduzido devolve o mesmo valor.
+ */
+export function translateLeague(league: string, country?: string): string {
+  const raw = league.trim();
+  if (!raw) return raw;
+  const hay = `${country ?? ""} ${raw}`;
+  for (const rule of BY_COUNTRY) {
+    if (!rule.country.test(hay)) continue;
+    const m = raw.match(rule.league);
+    if (m) return rule.pt(m);
+  }
+  for (const [re, pt] of LEAGUES) if (re.test(raw)) return pt;
+  return raw;
 }
 
 export function translateTeamName(name?: string): string | undefined {
