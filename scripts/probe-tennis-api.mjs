@@ -158,11 +158,20 @@ async function main() {
     if (!["atp", "wta"].includes(probeTour)) {
       line(`    ✗ TENNIS_PROBE_TOUR deve ser 'atp' ou 'wta' (recebido: '${probeTour}')`);
     } else {
+      // ATENÇÃO — usar INTERVALO, nunca a data isolada. As datas da API são UTC:
+      // um jogo da noite em Toronto (ex.: 22h05 EDT de 10/08) cai em 11/08 UTC.
+      // Consultar só /fixtures/2026-08-10 devolve 200 + o torneio presente e
+      // AINDA ASSIM não traz o jogo — falso negativo que em 2026-08-10 levou ao
+      // diagnóstico errado de "lacuna da origem". O intervalo cobre a virada.
+      const dayAfter = new Date(`${probeDate}T00:00:00Z`);
+      dayAfter.setUTCDate(dayAfter.getUTCDate() + 2);
+      const probeEnd = dayAfter.toISOString().slice(0, 10);
+      line(`    (janela UTC consultada: ${probeDate} → ${probeEnd})`);
       let page = 1;
       let hasNext = true;
       const all = [];
       while (hasNext && page <= 5) {
-        const r5 = await call(`/tennis/v2/${probeTour}/fixtures/${probeDate}?include=tournament&pageSize=100&pageNo=${page}`);
+        const r5 = await call(`/tennis/v2/${probeTour}/fixtures/${probeDate}/${probeEnd}?include=tournament&pageSize=100&pageNo=${page}`);
         if (r5.status !== 200) {
           line(`    ✗ HTTP ${r5.status} na página ${page} — abortando diagnóstico dirigido`);
           break;
@@ -197,10 +206,10 @@ async function main() {
           line(`      o bug está no NOSSO pipeline (board ms-api/upcoming ou cache), não na origem.`);
         } else {
           const tourHit = [...tournaments.values()].some((v) => terms.some((t) => v.toLowerCase().includes(t)));
-          line(`    ✗ confronto NÃO encontrado no endpoint core para ${probeDate}`);
+          line(`    ✗ confronto NÃO encontrado no endpoint core em ${probeDate}→${probeEnd}`);
           line(`      veredito: ${tourHit
-            ? "o torneio está listado, mas ESTE confronto específico ainda não foi publicado pela Matchstat — lacuna pontual da origem, não é bug nosso."
-            : "nem o torneio aparece nesta data — re-probe outra data (fase de grupos/qualifying pode cair em dia adjacente) antes de concluir que é lacuna da origem."}`);
+            ? "o torneio está listado, mas ESTE confronto não aparece na janela — provável lacuna pontual da origem. Antes de concluir, amplie a janela: chaveamento só é publicado depois que a rodada anterior fecha."
+            : "nem o torneio aparece nesta janela — amplie a janela antes de concluir que é lacuna da origem."}`);
         }
       }
     }

@@ -1,6 +1,7 @@
 // Cron de refresh do cache de tênis (docs/PLANO-autocomplete-tenis.md §9).
-// Executa o ciclo de 3 chamadas à RapidAPI (board ms-api/upcoming + fixtures
-// atp/wta -7d..-1d), normaliza e faz upsert em public.tennis_matches_cache.
+// Ciclo de ~5-7 chamadas à RapidAPI por rodada: board ms-api/upcoming (1-3),
+// fixtures -7d..-1d por tour (2) e fixtures hoje..+7d por tour (2). Normaliza e
+// faz upsert em public.tennis_matches_cache.
 // O cliente NUNCA chama esta função — só o pg_cron (e, manualmente, o dev).
 //
 // Deploy: supabase functions deploy tennis-refresh --no-verify-jwt
@@ -17,6 +18,8 @@ const MIN_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h (< TTL de 6h do cron)
 const BOARD_LIMIT = 500;
 const MAX_BOARD_PAGES = 4;
 const MAX_FIXTURE_PAGES = 3;
+// Janela de jogos futuros lida do endpoint core de fixtures (ver fetchUpcoming).
+const UPCOMING_DAYS = 7;
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -141,9 +144,12 @@ async function rapid(path: string, key: string): Promise<{ status: number; body:
 // fim — confirmado em 2026-08-10 que este endpoint devolve páginas de ~200
 // itens mesmo com limit=500, e `total` reflete a contagem DAQUELA página, não
 // o total geral (sem hasNextPage, ao contrário do endpoint de fixtures). Usar
-// esse corte fazia o board parar sempre na página 1, perdendo qualquer coisa
-// nas páginas seguintes — foi assim que o WTA Toronto (rankId 3, page 2)
-// sumiu do autocomplete com o board "completo" e sem nenhum erro.
+// esse corte fazia o board parar sempre na página 1, perdendo em silêncio tudo
+// da página 2 em diante (medido: 200 de 365 itens capturados) com a carga ainda
+// marcada como "completa".
+// ATENÇÃO: corrigir esta paginação NÃO basta para cobrir torneios de nível
+// principal — o board não lista o WTA Toronto (rankId 3) em página nenhuma.
+// Quem cobre esses jogos é fetchUpcoming(), no endpoint core de fixtures.
 async function fetchBoard(key: string): Promise<{ matches: BoardMatch[]; ok: boolean; calls: number }> {
   const all: BoardMatch[] = [];
   let calls = 0;
@@ -162,17 +168,23 @@ async function fetchBoard(key: string): Promise<{ matches: BoardMatch[]; ok: boo
   return { matches: all, ok: true, calls };
 }
 
-// Histórico curto -7d..-1d por tour (fixtures legado, pageSize/pageNo).
-async function fetchRecent(tour: string, key: string): Promise<{ matches: Fixture[]; ok: boolean; calls: number }> {
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  const now = Date.now();
-  const start = fmt(new Date(now - 7 * 864e5));
-  const end = fmt(new Date(now - 864e5));
+const fmtDay = (d: Date) => d.toISOString().slice(0, 10);
+
+// Endpoint CORE de fixtures por intervalo (pageSize/pageNo + hasNextPage REAL).
+// É a fonte de verdade documentada — ao contrário do board ms-api/upcoming, que
+// não expõe hasNextPage e (confirmado 2026-08-10) simplesmente NÃO lista parte
+// dos torneios de nível principal, entre eles o WTA Toronto (rankId 3).
+async function fetchFixtures(
+  tour: string,
+  start: string,
+  end: string,
+  key: string,
+): Promise<{ matches: Fixture[]; ok: boolean; calls: number }> {
   const all: Fixture[] = [];
   let calls = 0;
   for (let pageNo = 1; pageNo <= MAX_FIXTURE_PAGES; pageNo++) {
     const { status, body } = await rapid(
-      `/tennis/v2/${tour}/fixtures/${start}/${end}?pageSize=100&pageNo=${pageNo}`,
+      `/tennis/v2/${tour}/fixtures/${start}/${end}?include=tournament&pageSize=100&pageNo=${pageNo}`,
       key,
     );
     calls++;
@@ -187,6 +199,28 @@ async function fetchRecent(tour: string, key: string): Promise<{ matches: Fixtur
   }
   return { matches: all, ok: true, calls };
 }
+
+// Histórico curto -7d..-1d por tour.
+const fetchRecent = (tour: string, key: string) =>
+  fetchFixtures(
+    tour,
+    fmtDay(new Date(Date.now() - 7 * 864e5)),
+    fmtDay(new Date(Date.now() - 864e5)),
+    key,
+  );
+
+// Janela FUTURA hoje..+UPCOMING_DAYS por tour. Este é o fix da lacuna que fazia
+// torneios de nível principal nunca chegarem ao autocomplete: até 2026-08-10 os
+// jogos futuros vinham SÓ do board ms-api/upcoming, que não lista o WTA Toronto.
+// Medido em 2026-08-10: a semana inteira do WTA cabe em 73 itens / 1 chamada
+// (hasNextPage=false), então o custo de cota é ~1 chamada por tour por refresh.
+const fetchUpcoming = (tour: string, key: string) =>
+  fetchFixtures(
+    tour,
+    fmtDay(new Date()),
+    fmtDay(new Date(Date.now() + UPCOMING_DAYS * 864e5)),
+    key,
+  );
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "method not allowed" }, 405);
@@ -223,7 +257,9 @@ Deno.serve(async (req) => {
   const board = await fetchBoard(key);
   const atp = await fetchRecent("atp", key);
   const wta = await fetchRecent("wta", key);
-  const calls = board.calls + atp.calls + wta.calls;
+  const atpNext = await fetchUpcoming("atp", key);
+  const wtaNext = await fetchUpcoming("wta", key);
+  const calls = board.calls + atp.calls + wta.calls + atpNext.calls + wtaNext.calls;
 
   // Dedup por match_id: o board (upcoming, com rankId/torneio) tem precedência
   // sobre o histórico quando o mesmo id aparecer nos dois.
@@ -242,6 +278,27 @@ Deno.serve(async (req) => {
     if (r) rows.set(r.match_id, r);
   }
 
+  // Jogos futuros do endpoint CORE entram POR ÚLTIMO e têm precedência sobre o
+  // board, porque trazem (a) o match_id REAL — o board não tem id de partida e
+  // obriga a sintetizar um id negativo a partir dos jogadores — e (b) torneios
+  // de nível principal que o board pura e simplesmente não lista.
+  // A poda por (tour|hay) é obrigatória: sem ela o mesmo confronto entraria
+  // DUAS vezes no autocomplete, uma com o id sintético do board e outra com o
+  // id real do core (as datas podem divergir em horas entre as duas fontes,
+  // então dedupe por data não resolveria).
+  const upcomingKey = (r: Row) => `${r.tour}|${r.hay}`;
+  const boardUpcoming = new Map<string, number>();
+  for (const [id, r] of rows) if (!r.is_past) boardUpcoming.set(upcomingKey(r), id);
+  for (const [tour, res] of [["atp", atpNext], ["wta", wtaNext]] as const) {
+    for (const m of res.matches) {
+      const r = toRow(m, tour, false, nowIso);
+      if (!r) continue;
+      const dup = boardUpcoming.get(upcomingKey(r));
+      if (dup !== undefined && dup !== r.match_id) rows.delete(dup);
+      rows.set(r.match_id, r);
+    }
+  }
+
   let upserted = 0;
   const list = [...rows.values()];
   for (let i = 0; i < list.length; i += 500) {
@@ -258,17 +315,21 @@ Deno.serve(async (req) => {
   // Poda 2 (só após board COMPLETO): upcoming que sumiu do feed (cancelado/
   // remarcado) fica com refreshed_at antigo. 2×TTL de folga. Com board
   // incompleto NÃO podar — apagaria jogos válidos que só não foram re-vistos.
-  if (board.ok) {
+  // Só podar com TODAS as fontes de "upcoming" completas (board + core): se uma
+  // delas falhou, os jogos que ela cobre ficaram sem refresh nesta rodada e
+  // seriam apagados como se tivessem sumido do feed.
+  if (board.ok && atpNext.ok && wtaNext.ok) {
     const stale = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
     await admin.from("tennis_matches_cache").delete()
       .eq("is_past", false).lt("refreshed_at", stale);
   }
 
   return json({
-    ok: board.ok && atp.ok && wta.ok,
+    ok: board.ok && atp.ok && wta.ok && atpNext.ok && wtaNext.ok,
     upserted,
     calls,
     board: { ok: board.ok, matches: board.matches.length },
     recent: { atp: { ok: atp.ok, n: atp.matches.length }, wta: { ok: wta.ok, n: wta.matches.length } },
+    upcoming: { atp: { ok: atpNext.ok, n: atpNext.matches.length }, wta: { ok: wtaNext.ok, n: wtaNext.matches.length } },
   });
 });
