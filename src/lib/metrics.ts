@@ -25,6 +25,80 @@ export type Metrics = {
   evCount: number;
 };
 
+/**
+ * Perfil de drawdown da curva de lucro acumulado (P&L), medido a partir do
+ * high-water mark — o maior valor já atingido pela curva.
+ *
+ * Nota metodológica: a curva começa em 0 e o pico inicial é 0, de modo que
+ * todos os valores são RELATIVOS ao conjunto recebido, não à banca absoluta.
+ * Um subconjunto (ex.: últimos 30 dias) tem sua própria curva reiniciada e
+ * NÃO é comparável ao perfil do histórico completo — para medir a situação
+ * recente na curva real, use `currentDrawdown` do histórico completo.
+ */
+export type DrawdownProfile = {
+  /** Pior queda já registrada a partir de um pico. ≤ 0. */
+  maxDrawdown: number;
+  /** Distância atual até o high-water mark. ≤ 0; 0 = a curva está no topo. */
+  currentDrawdown: number;
+  /** bet_date em que o pior drawdown foi tocado (fundo). null se nunca houve. */
+  troughDate: string | null;
+  /** bet_date do último high-water mark. null se a curva nunca superou 0. */
+  peakDate: string | null;
+  /**
+   * Fração do pior drawdown já recuperada: 0 = ainda no fundo,
+   * 1 = curva de volta ao topo. Vale 1 quando nunca houve drawdown.
+   */
+  recoveredFraction: number;
+};
+
+/**
+ * Ordena as liquidadas por data. Desempate por created_at: sem ele, apostas do
+ * mesmo bet_date teriam ordem indeterminada e drawdown/streak variariam entre
+ * execuções.
+ */
+function orderSettled(bets: Bet[]): Bet[] {
+  return bets
+    .filter((b) => isSettled(b.status))
+    .sort(
+      (a, b) =>
+        new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime() ||
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+}
+
+/** Percorre a curva já ordenada uma única vez. Fonte única do drawdown. */
+function drawdownFrom(ordered: Bet[]): DrawdownProfile {
+  let peak = 0;
+  let cum = 0;
+  let maxDd = 0;
+  let troughDate: string | null = null;
+  let peakDate: string | null = null;
+  for (const b of ordered) {
+    cum += Number(b.net_profit || 0);
+    if (cum > peak) {
+      peak = cum;
+      peakDate = b.bet_date;
+    }
+    const dd = cum - peak;
+    if (dd < maxDd) {
+      maxDd = dd;
+      troughDate = b.bet_date;
+    }
+  }
+  const currentDrawdown = cum - peak;
+  return {
+    maxDrawdown: maxDd,
+    currentDrawdown,
+    troughDate,
+    peakDate,
+    recoveredFraction: maxDd < 0 ? 1 - currentDrawdown / maxDd : 1,
+  };
+}
+
+export function computeDrawdownProfile(bets: Bet[]): DrawdownProfile {
+  return drawdownFrom(orderSettled(bets));
+}
+
 export function computeMetrics(bets: Bet[]): Metrics {
   const settled = bets.filter((b) => isSettled(b.status));
   // Freebets não são capital real arriscado — a stake não entra no turnover (yield/ROI).
@@ -37,23 +111,9 @@ export function computeMetrics(bets: Bet[]): Metrics {
   const avgOdds = settled.length ? settled.reduce((s, b) => s + Number(b.odds), 0) / settled.length : 0;
   const avgStake = bets.length ? stakeTotal / bets.length : 0;
 
-  // Cumulative + drawdown — order ascending by date.
-  // Desempate por created_at: sem ele, apostas do mesmo bet_date teriam ordem
-  // indeterminada e drawdown/streak variariam entre execuções.
-  const ordered = [...settled].sort(
-    (a, b) =>
-      new Date(a.bet_date).getTime() - new Date(b.bet_date).getTime() ||
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
-  let peak = 0;
-  let cum = 0;
-  let maxDd = 0;
-  for (const b of ordered) {
-    cum += Number(b.net_profit || 0);
-    if (cum > peak) peak = cum;
-    const dd = cum - peak;
-    if (dd < maxDd) maxDd = dd;
-  }
+  // Curva acumulada + drawdown. Uma ordenação só, reaproveitada pela streak.
+  const ordered = orderSettled(settled);
+  const { maxDrawdown: maxDd } = drawdownFrom(ordered);
 
   // Current streak
   let streakType: "green" | "red" | "none" = "none";
