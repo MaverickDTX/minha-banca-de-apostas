@@ -69,9 +69,12 @@ const BY_COUNTRY: Array<{ country: RegExp; league: RegExp; pt: (m: RegExpMatchAr
 // antes do torneio principal, "K League 2" antes de "K League".
 const LEAGUES: Array<[RegExp, string]> = [
   // Seleções e competições internacionais
-  [/FIFA World Cup Qualifiers?/i, "Eliminatórias da Copa do Mundo"],
+  [/FIFA World Cup Qualifiers?/i, "Eliminatórias da Copa do Mundo FIFA"],
   [/FIFA Club World Cup|Club World Cup/i, "Mundial de Clubes"],
-  [/FIFA World Cup|World Cup/i, "Copa do Mundo"],
+  // Exigir "FIFA" é deliberado: "World Cup" solto casaria com as copas do mundo
+  // de rúgbi, basquete, críquete etc., jogando todas na mesma chave de
+  // agrupamento da de futebol. Sem FIFA no nome, o original é preservado.
+  [/FIFA World Cup/i, "Copa do Mundo FIFA"],
   [/UEFA European Championship Qualif(ying|iers?)/i, "Eliminatórias da Eurocopa"],
   [/UEFA European Championship/i, "Eurocopa"],
   [/UEFA Nations League/i, "Liga das Nações"],

@@ -85,8 +85,16 @@ describe("translateLeague", () => {
   });
 
   it("traduz a Copa do Mundo sem colidir com as eliminatórias", () => {
-    expect(translateLeague("FIFA World Cup")).toBe("Copa do Mundo");
-    expect(translateLeague("FIFA World Cup Qualifiers")).toBe("Eliminatórias da Copa do Mundo");
+    expect(translateLeague("FIFA World Cup")).toBe("Copa do Mundo FIFA");
+    expect(translateLeague("FIFA World Cup Qualifiers")).toBe(
+      "Eliminatórias da Copa do Mundo FIFA",
+    );
+    expect(translateLeague("FIFA Club World Cup")).toBe("Mundial de Clubes");
+  });
+
+  it("não rotula copas do mundo de outros esportes como a de futebol", () => {
+    expect(translateLeague("Rugby World Cup")).toBe("Rugby World Cup");
+    expect(translateLeague("FIBA Basketball World Cup")).toBe("FIBA Basketball World Cup");
   });
 
   it("cobre a Conference League após a renomeação da UEFA", () => {
