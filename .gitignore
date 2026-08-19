@@ -48,3 +48,6 @@ supabase/.temp/
 
 deno.lock
 board.json
+
+# Cache de compilação do TypeScript (artefato local)
+*.tsbuildinfo
