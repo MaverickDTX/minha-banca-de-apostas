@@ -214,6 +214,11 @@ export default function ImportExport() {
     if (isNaN(stake) || stake <= 0) errors.push("stake inválida");
     if (!STATUS_LABELS[status]) errors.push("status desconhecido");
 
+    // `sport` em branco grava NULL e derruba a aposta para o fallback genérico da
+    // picklist, além de sumir das análises por esporte. Não há default seguro:
+    // preencher "Futebol" classificaria errado qualquer linha de outro esporte.
+    if (!isMultiple && !(bet.sport || "").trim()) errors.push("esporte ausente");
+
     let finalOdds = 0;
     let finalStatus = status;
     let parsedLegs: BetLegInput[] | undefined = undefined;
