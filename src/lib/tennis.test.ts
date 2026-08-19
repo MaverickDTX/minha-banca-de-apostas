@@ -72,18 +72,30 @@ describe("índice de tênis", () => {
     player2: { id: id * 2 + 1, name: p2 },
   });
   const emptyFixtures = () => fixtures([]);
+  // O board só sabe que acabou quando recebe uma página vazia (ver loadUpcomingBoard):
+  // `total` reflete a página atual, não o total geral, e não há hasNextPage. Toda
+  // sequência de board portanto termina com uma sonda vazia — é uma requisição a
+  // mais que o número de páginas com conteúdo, custo intencional do fix do 5ad06c7,
+  // que antes parava na página 1 e perdia torneios inteiros.
+  const emptyBoard = () => board([]);
+  // Caminhos do board realmente pedidos, na ordem. Preferido a contar chamadas:
+  // a contagem já foi contrato aqui uma vez e brigou com a correção do código.
+  const boardPaths = () =>
+    invoke.mock.calls.map((call) => call[1]?.body?.path).filter(Boolean) as string[];
+  const boardPage = (page: number) => `/tennis/v2/ms-api/upcoming/matches?limit=500&page=${page}`;
 
   it("carrega board de uma página e histórico em duas chamadas", async () => {
     invoke
       .mockResolvedValueOnce(board([match(1)]))
+      .mockResolvedValueOnce(emptyBoard())
       .mockResolvedValueOnce(emptyFixtures())
       .mockResolvedValueOnce(emptyFixtures());
 
     const result = await loadTennisIndex();
     expect(result.complete).toBe(true);
     expect(result.events).toHaveLength(1);
-    expect(invoke).toHaveBeenCalledTimes(3);
-    expect(invoke.mock.calls[0][1].body.path).toBe("/tennis/v2/ms-api/upcoming/matches?limit=500&page=1");
+    // Para na primeira página vazia, sem varrer até MAX_BOARD_PAGES.
+    expect(boardPaths()).toEqual([boardPage(1), boardPage(2)]);
   });
 
   it("pagina board saturado", async () => {
@@ -91,17 +103,21 @@ describe("índice de tênis", () => {
     invoke
       .mockResolvedValueOnce(board(firstPage, 501))
       .mockResolvedValueOnce(board([match(1001)], 501))
+      .mockResolvedValueOnce(emptyBoard())
       .mockResolvedValueOnce(emptyFixtures())
       .mockResolvedValueOnce(emptyFixtures());
 
     const result = await loadTennisIndex();
     expect(result.events).toHaveLength(501);
-    expect(invoke.mock.calls[1][1].body.path).toContain("page=2");
+    // Segue para a página 2 mesmo com `total` menor que o acumulado — era esse
+    // corte que fazia o board parar cedo (WTA Toronto só existia na página 2).
+    expect(boardPaths()).toEqual([boardPage(1), boardPage(2), boardPage(3)]);
   });
 
   it("inclui doubles no índice, buscável por parceiro individual", async () => {
     invoke
       .mockResolvedValueOnce(board([match(1, "Player A/Player B", "Player C/Player D")]))
+      .mockResolvedValueOnce(emptyBoard())
       .mockResolvedValueOnce(emptyFixtures())
       .mockResolvedValueOnce(emptyFixtures());
 
@@ -116,6 +132,7 @@ describe("índice de tênis", () => {
     const shared = match(1);
     invoke
       .mockResolvedValueOnce(board([shared]))
+      .mockResolvedValueOnce(emptyBoard())
       .mockResolvedValueOnce(fixtures([shared]))
       .mockResolvedValueOnce(emptyFixtures());
 
@@ -125,6 +142,7 @@ describe("índice de tênis", () => {
   it("faz cache-hit na segunda busca", async () => {
     invoke
       .mockResolvedValueOnce(board([match(1)]))
+      .mockResolvedValueOnce(emptyBoard())
       .mockResolvedValueOnce(emptyFixtures())
       .mockResolvedValueOnce(emptyFixtures());
 
