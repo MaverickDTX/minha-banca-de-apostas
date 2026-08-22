@@ -272,6 +272,7 @@ function detectMarketType(market: string, sport?: string): MarketType {
   if (m.includes("rebote") || m.includes("assist") || m.includes("pra") || m.includes("cestas de 3") || m.includes("duplo") || m.includes("triplo")) return "nba_player";
   if (m.includes("ponto")) return "nba_points";
   if (m.includes("spread")) return "nba_spread";
+  if (sport === "Basquete" && (m.includes("moneyline") || m.includes("vencedor"))) return "nba_ml";
 
   // Tênis
   if (m.includes("game") || m.includes("ace")) return "tennis_games";
