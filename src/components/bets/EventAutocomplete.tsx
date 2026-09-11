@@ -52,11 +52,19 @@ export function EventAutocomplete({
           setResults(list);
           setOpen(true);
         }
+      } catch {
+        if (!ctrl.signal.aborted) {
+          setResults([]);
+          setOpen(true);
+        }
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }
     }, 500);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      abortRef.current?.abort();
+    };
   }, [value, sport]);
 
   function pick(ev: SportEvent) {

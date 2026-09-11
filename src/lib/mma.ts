@@ -2,7 +2,7 @@
 // 1. TheSportsDB promoções (UFC, KSW, Oktagon, Jungle Fight)
 // 2. The Odds API (eventos futuros com odds)
 // 3. API-Sports MMA (busca por lutador)
-// O cache é armazenado mesmo vazio (evita re-fetch infinito).
+// Apenas respostas bem-sucedidas entram no cache, com validade limitada.
 
 import type { SportEvent } from "@/lib/sportsdb";
 
@@ -29,7 +29,8 @@ type TsdbEvent = {
 const normText = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
-const promoCache = new Map<string, (SportEvent & { _hay: string })[]>();
+const CACHE_TTL = 5 * 60_000;
+const promoCache = new Map<string, { expires: number; events: TsdbEvent[] }>();
 
 function toIso(e: TsdbEvent): string | null {
   if (e.strTimestamp) {
@@ -46,23 +47,24 @@ function toIso(e: TsdbEvent): string | null {
 function splitFighters(strEvent: string): { home?: string; away?: string } {
   const parts = strEvent.split(/\s+vs\.?\s+|\s+x\s+/i);
   if (parts.length !== 2) return {};
-  const left = parts[0].trim().split(/\s+/);
-  const home = left.slice(-1)[0];
+  const home = parts[0].trim().replace(/^.*?(?:\d+|:)\s+/, "");
   const away = parts[1].trim().replace(/\s+\d+$/, "");
   return { home, away };
 }
 
 async function loadPromotion(id: string, signal?: AbortSignal): Promise<TsdbEvent[]> {
+  const cached = promoCache.get(id);
+  if (cached && cached.expires > Date.now()) return cached.events;
   const res = await fetch(`${TSDB_BASE}/eventsnextleague.php?id=${id}`, { signal });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error(`MMA schedule: ${res.status}`);
   const json = await res.json();
-  return Array.isArray(json?.events) ? json.events : [];
+  const events = Array.isArray(json?.events) ? json.events : [];
+  signal?.throwIfAborted();
+  promoCache.set(id, { expires: Date.now() + CACHE_TTL, events });
+  return events;
 }
 
 async function loadUpcoming(signal?: AbortSignal) {
-  const cached = promoCache.get("all");
-  if (cached) return cached;
-
   const lists = await Promise.all(
     MMA_PROMOTIONS.map((p) => loadPromotion(p.id, signal).catch(() => [])),
   );
@@ -70,7 +72,7 @@ async function loadUpcoming(signal?: AbortSignal) {
     const { home, away } = splitFighters(e.strEvent);
     return {
       id: `mma-${e.idEvent}`,
-      name: e.strEvent,
+      name: e.strEvent.replace(/\s+vs\.?\s+/gi, " x "),
       sport: "MMA",
       league: e.strLeague ?? "MMA",
       date: toIso(e),
@@ -82,7 +84,7 @@ async function loadUpcoming(signal?: AbortSignal) {
   events.sort(
     (a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity),
   );
-  promoCache.set("all", events); // cache mesmo vazio — evita re-fetch
+  signal?.throwIfAborted();
   return events;
 }
 
@@ -91,31 +93,32 @@ type MmaEvent = SportEvent & { _hay: string };
 // ---------- The Odds API (fonte secundária, carregamento preguiçoso) ----------
 const ODDS_KEY = import.meta.env.VITE_ODDS_API_KEY as string | undefined;
 const ODDS_BASE = "https://api.the-odds-api.com/v4";
-const oddsGroupCache = new Map<string, SportEvent[]>();
+const oddsGroupCache = new Map<string, { expires: number; events: SportEvent[] }>();
 
 async function loadOddsEvents(signal?: AbortSignal): Promise<SportEvent[]> {
   const sportKey = "mma_mixed_martial_arts";
   const cached = oddsGroupCache.get(sportKey);
-  if (cached) return cached;
+  if (cached && cached.expires > Date.now()) return cached.events;
 
-  if (!ODDS_KEY) { oddsGroupCache.set(sportKey, []); return []; }
+  if (!ODDS_KEY) return [];
 
-  const url = `${ODDS_BASE}/sports/${sportKey}/odds?regions=us&markets=h2h&apiKey=${ODDS_KEY}`;
+  const url = `${ODDS_BASE}/sports/${sportKey}/events?apiKey=${ODDS_KEY}`;
   let res: Response;
-  try { res = await fetch(url, { signal }); } catch { oddsGroupCache.set(sportKey, []); return []; }
-  if (!res.ok) { oddsGroupCache.set(sportKey, []); return []; }
+  try { res = await fetch(url, { signal }); } catch { signal?.throwIfAborted(); return []; }
+  if (!res.ok) return [];
   const json: unknown = await res.json();
   const arr = Array.isArray(json) ? json : [];
   const events: SportEvent[] = arr.map((e: { id: string; commence_time: string; sport_title: string; home_team: string; away_team: string }) => ({
     id: `oddsapi-${e.id}`,
-    name: `${e.home_team} vs ${e.away_team}`,
+    name: `${e.home_team} x ${e.away_team}`,
     sport: "MMA",
     league: e.sport_title,
     date: new Date(e.commence_time).toISOString(),
     homeTeam: e.home_team,
     awayTeam: e.away_team,
   }));
-  oddsGroupCache.set(sportKey, events);
+  signal?.throwIfAborted();
+  oddsGroupCache.set(sportKey, { expires: Date.now() + CACHE_TTL, events });
   return events;
 }
 
@@ -142,8 +145,10 @@ async function loadApisportsMma(query: string, signal?: AbortSignal): Promise<Sp
 
   if (!fighterId) return [];
 
-  const seasons = [new Date().getFullYear() - 2, new Date().getFullYear() - 3, new Date().getFullYear() - 4];
+  const year = new Date().getFullYear();
+  const seasons = [year, year - 1, year - 2, year - 3, year - 4];
   for (const s of seasons) {
+    signal?.throwIfAborted();
     try {
       const res = await fetch(
         `https://v1.mma.api-sports.io/fights?fighter=${fighterId}&season=${s}`,
@@ -153,12 +158,12 @@ async function loadApisportsMma(query: string, signal?: AbortSignal): Promise<Sp
       const json = await res.json();
       const fights = Array.isArray(json?.response) ? json.response : [];
       if (fights.length === 0) continue;
-      return fights.map((f: { id: number; date: string; fighters: { fighter: { id: number; name: string } }[] }) => {
-        const a = f.fighters[0]?.fighter.name ?? "";
-        const b = f.fighters[1]?.fighter.name ?? "";
+      return fights.map((f: { id: number; date: string; fighters: { first?: { name: string }; second?: { name: string } } }) => {
+        const a = f.fighters.first?.name ?? "";
+        const b = f.fighters.second?.name ?? "";
         return {
           id: `apisports-mma-${f.id}`,
-          name: `${a} vs ${b}`,
+          name: `${a} x ${b}`,
           sport: "MMA",
           league: "MMA",
           date: new Date(f.date).toISOString(),
@@ -204,11 +209,11 @@ export async function searchMmaEvents(
   const q = normText(query);
 
   // 1. TheSportsDB (promoções)
-  const tsdbRaw = await loadUpcoming(signal);
-
-  // 2. The Odds API (sempre tenta, como fallback)
-  let odds: SportEvent[] = [];
-  try { odds = await loadOddsEvents(signal); } catch { /* opcional */ }
+  const [tsdbRaw, odds] = await Promise.all([
+    loadUpcoming(signal),
+    loadOddsEvents(signal).catch(() => [] as SportEvent[]),
+  ]);
+  signal?.throwIfAborted();
 
   // Fusiona TSDB + Odds (dedup por id)
   const merged = dedupeAndSort([...tsdbRaw.map(stripMma), ...odds]);
@@ -219,7 +224,8 @@ export async function searchMmaEvents(
   const hayFn = (ev: SportEvent) =>
     normText([ev.homeTeam ?? "", ev.awayTeam ?? "", ev.name, ev.sport, ev.league].join(" "));
 
-  let filtered = merged.slice(0, 40).filter((ev) => hayFn(ev).includes(q));
+  const tokens = q.split(/\s+/).filter((token) => !["vs", "vs.", "x"].includes(token));
+  let filtered = merged.filter((ev) => tokens.every((token) => hayFn(ev).includes(token)));
 
   // 3. Fallback: API-Sports MMA (busca por lutador). Só roda quando o MMA é o
   // esporte selecionado (fighterFallback !== false) — como fonte secundária de

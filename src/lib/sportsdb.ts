@@ -207,7 +207,7 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
   let mmaPartial: SportEvent[] = [];
   if (rawLabel === "mma") {
     mmaPartial = await searchMmaEvents(q, signal);
-    if (mmaPartial.length >= 2) return mmaPartial; // primário resolveu → retorna cedo
+    if (mmaPartial.length > 0) return mmaPartial;
     // senão cai no fluxo abaixo onde TheSportsDB genérico pode achar lutas extras
   }
 
@@ -336,7 +336,7 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     } catch { hadError = true; }
   }
 
-  if (list.length > 0 || !hadError) {
+  if (rawLabel !== "mma" && (list.length > 0 || !hadError)) {
     sportCache.set(cacheKey, list);
   }
   return list;
