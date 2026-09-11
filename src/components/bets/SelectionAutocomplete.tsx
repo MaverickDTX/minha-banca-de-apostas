@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { normalizeSearchText } from "@/lib/searchText";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { getSelectionSuggestions } from "@/lib/marketSuggestions";
@@ -22,6 +23,9 @@ export function SelectionAutocomplete({
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (blurTimer.current !== null) window.clearTimeout(blurTimer.current);
+  }, []);
   // quando o mercado muda, recalculamos sugestões; se o input estiver focado,
   // reabre o popover para o usuário escolher de novo sem precisar clicar fora.
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -37,9 +41,9 @@ export function SelectionAutocomplete({
   );
 
   const filtered = useMemo(() => {
-    const q = value.trim().toLowerCase();
+    const q = normalizeSearchText(value);
     if (!q) return suggestions;
-    return suggestions.filter((s) => s.label.toLowerCase().includes(q));
+    return suggestions.filter((s) => normalizeSearchText(s.label).includes(q));
   }, [suggestions, value]);
 
   const grouped = useMemo(() => {
@@ -59,7 +63,7 @@ export function SelectionAutocomplete({
           ref={inputRef}
           value={value}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (blurTimer.current !== null) window.clearTimeout(blurTimer.current); setOpen(true); }}
           onClick={() => setOpen(true)}
           onBlur={() => {
             blurTimer.current = window.setTimeout(() => setOpen(false), 150);

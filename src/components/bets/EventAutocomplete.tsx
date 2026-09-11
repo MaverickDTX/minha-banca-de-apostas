@@ -34,13 +34,16 @@ export function EventAutocomplete({
 
   useEffect(() => {
     const q = value.trim();
+    setResults([]);
+    setOpen(false);
     if (skipQueryRef.current !== null && q === skipQueryRef.current.trim()) {
       setLoading(false);
       return;
     }
+    skipQueryRef.current = null;
     // Mínimo 3 chars + debounce 500ms: queries de 2 letras nunca acham nada
     // útil e cada disparo custa até 6 requests somando as duas APIs.
-    if (q.length < 3) { setResults([]); setLoading(false); setOpen(false); return; }
+    if (q.length < 3 && !(sport === "Automobilismo" && q.toLowerCase() === "f1")) { setLoading(false); return; }
     const handle = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();

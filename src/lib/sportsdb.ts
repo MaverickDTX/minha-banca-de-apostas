@@ -5,7 +5,7 @@ const KEY = "3";
 const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 
 import { translateEventName, translateLeague, translateTeamName, translateQueryToEnglish } from "@/lib/translate";
-import { searchEventsBySport, hasApiProduct, shouldTryTheSportsDbFirst } from "@/lib/apisportsMulti";
+import { searchEventsBySport, hasApiProduct } from "@/lib/apisportsMulti";
 import { searchF1Races } from "@/lib/apisportsF1";
 import { searchTennisMatches } from "@/lib/tennis";
 import { searchMmaEvents } from "@/lib/mma";
@@ -36,7 +36,8 @@ function toIso(e: RawEvent): string | null {
   if (e.strTimestamp) {
     // strTimestamp is UTC per docs but lacks "Z"
     const s = e.strTimestamp.includes("T") ? e.strTimestamp : e.strTimestamp.replace(" ", "T");
-    return new Date(s + "Z").toISOString();
+    const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s) ? s : s + "Z");
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
   if (e.dateEvent) {
     const t = e.strTime && e.strTime !== "00:00:00" ? e.strTime : "00:00:00";
@@ -59,7 +60,7 @@ function normalize(e: RawEvent): SportEvent {
   };
 }
 
-const sportCache = new Map<string, SportEvent[]>();
+const sportCache = new Map<string, { events: SportEvent[]; expires: number }>();
 
 const normText = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
@@ -187,13 +188,13 @@ async function fetchTeamSchedule(
  */
 export async function searchEvents(query: string, signal?: AbortSignal, sport?: string): Promise<SportEvent[]> {
   const q = query.trim();
-  if (q.length < 3) return [];
+  if (q.length < 3 && !(q.toLowerCase() === "f1" && sport === "Automobilismo")) return [];
 
   const rawLabel = (sport ?? "").trim().toLowerCase();
   // sport da UI já vem em PT-BR (ex.: "Automobilismo"). Se for uma chave
   // conhecida do registry API-Sports, usa direto; senão passa pelo mapSportLabel
   // para converter de inglês (TheSportsDB) → PT-BR.
-  const label = hasApiProduct(rawLabel) ? rawLabel : mapSportLabel(sport ?? "");
+  const label = (hasApiProduct(rawLabel) ? rawLabel : mapSportLabel(sport ?? "")).toLowerCase();
 
   // Tênis: Matchstat via proxy (edge function tennis-fixtures); fallback TheSportsDB (cobertura fraca)
   if (rawLabel === "tênis") {
@@ -232,7 +233,7 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
 
   const cacheKey = `${label}|${normText(searchQ)}|${matchup ? normText(matchup[1]) : ""}`;
   const cached = sportCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached && cached.expires > Date.now()) return cached.events;
 
   let hadError = false;
   const results = new Map<string, SportEvent>();
@@ -300,6 +301,9 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     }
     return l
       .sort((a, b) => {
+        const aSelected = mapSportLabel(a.sport).toLowerCase() === label;
+        const bSelected = mapSportLabel(b.sport).toLowerCase() === label;
+        if (aSelected !== bSelected) return aSelected ? -1 : 1;
         const at = a.date ? Date.parse(a.date) : Infinity;
         const bt = b.date ? Date.parse(b.date) : Infinity;
         const now = Date.now();
@@ -328,16 +332,21 @@ export async function searchEvents(query: string, signal?: AbortSignal, sport?: 
     }
   }
 
-  // Fallback: TheSportsDB vazio → tenta API-Sports (só para esportes sem TSDB)
-  if (list.length === 0 && hasApiProduct(label) && !shouldTryTheSportsDbFirst(label)) {
+  // Sem resultados do esporte selecionado, tenta a fonte secundária.
+  // MMA já executou esse fallback dentro de searchMmaEvents.
+  signal?.throwIfAborted();
+  if (label !== "mma" && !list.some((ev) => mapSportLabel(ev.sport).toLowerCase() === label) && hasApiProduct(label)) {
     try {
-      let fallback = await searchEventsBySport(q, signal, label);
+      let fallback = await searchEventsBySport(searchQ, signal, label);
       if (opponentVariants) fallback = fallback.filter((ev) => matchesTeam(ev, opponentVariants));
+      for (const ev of fallback) results.set(ev.id, ev);
+      list = filterAndSort();
     } catch { hadError = true; }
   }
 
-  if (rawLabel !== "mma" && (list.length > 0 || !hadError)) {
-    sportCache.set(cacheKey, list);
+  signal?.throwIfAborted();
+  if (rawLabel !== "mma" && list.length > 0 && !hadError) {
+    sportCache.set(cacheKey, { events: list, expires: Date.now() + 5 * 60_000 });
   }
   return list;
 }

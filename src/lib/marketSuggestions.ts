@@ -242,7 +242,7 @@ export const COMMON_MARKETS: string[] = MARKETS_BY_SPORT.Futebol;
 type MarketType =
   | "1x2" | "dc" | "btts" | "ou" | "ah" | "corners" | "cards"
   | "player" | "scorer"
-  | "tennis_winner" | "tennis_games" | "tennis_sets"
+  | "tennis_winner" | "tennis_games" | "tennis_sets" | "sets_total"
   | "nba_ml" | "nba_spread" | "nba_points" | "nba_player"
   | "f1_driver" | "f1_h2h" | "f1_yesno"
   | "mma_winner" | "mma_method" | "mma_rounds" | "mma_yesno";
@@ -275,6 +275,9 @@ function detectMarketType(market: string, sport?: string): MarketType {
   if (sport === "Basquete" && (m.includes("moneyline") || m.includes("vencedor"))) return "nba_ml";
 
   // Tênis
+  if ((sport === "Tênis" || sport === "Vôlei") && (m.includes("vencedor") || m.includes("moneyline"))) return "tennis_winner";
+  if (m.includes("handicap") && (m.includes("game") || m.includes("set"))) return "ah";
+  if (m.includes("total") && m.includes("set")) return "sets_total";
   if (m.includes("game") || m.includes("ace")) return "tennis_games";
   if (m.includes("set")) return m.includes("vencedor") ? "tennis_winner" : "tennis_sets";
 
@@ -364,6 +367,12 @@ export function getSelectionSuggestions(
       for (const l of [20.5, 21.5, 22.5, 23.5]) {
         out.push({ label: `Mais de ${l} games`, group: "Games" });
         out.push({ label: `Menos de ${l} games`, group: "Games" });
+      }
+      break;
+    case "sets_total":
+      for (const l of sport === "Vôlei" ? [3.5, 4.5] : [2.5, 3.5, 4.5]) {
+        out.push({ label: `Mais de ${l} sets`, group: "Total de sets" });
+        out.push({ label: `Menos de ${l} sets`, group: "Total de sets" });
       }
       break;
     case "tennis_sets":

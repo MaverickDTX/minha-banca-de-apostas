@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { normalizeSearchText } from "@/lib/searchText";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useProfile } from "@/hooks/useProfile";
@@ -21,6 +22,9 @@ export function TipsterAutocomplete({
   const { data: bets = [] } = useBets();
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (blurTimer.current !== null) window.clearTimeout(blurTimer.current);
+  }, []);
 
   const options = useMemo(() => {
     const set = new Set<string>();
@@ -30,9 +34,9 @@ export function TipsterAutocomplete({
   }, [profile?.tipsters, bets]);
 
   const filtered = useMemo(() => {
-    const q = value.trim().toLowerCase();
+    const q = normalizeSearchText(value);
     if (!q) return options;
-    return options.filter((t) => t.toLowerCase().includes(q));
+    return options.filter((t) => normalizeSearchText(t).includes(q));
   }, [value, options]);
 
   return (
@@ -41,7 +45,7 @@ export function TipsterAutocomplete({
         <Input
           value={value}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (blurTimer.current !== null) window.clearTimeout(blurTimer.current); setOpen(true); }}
           onClick={() => setOpen(true)}
           onBlur={() => {
             blurTimer.current = window.setTimeout(() => setOpen(false), 150);

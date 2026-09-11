@@ -99,17 +99,23 @@ export async function searchF1Races(
 ): Promise<SportEvent[]> {
   const includeAll = opts?.includeAll ?? true;
   const q = normText(query);
-  if (q.length < 3) return [];
+  if (q.length < 3 && !(includeAll && q === "f1")) return [];
   const qEn = PT_EN[q] ?? q;
   const year = new Date().getFullYear();
 
   let races = await loadSeason(year, signal);
   if (races.length === 0) races = await loadSeason(year - 1, signal);
 
-  const generic = includeAll && (["f1", "formula", "formula 1", "formula1", "grand prix", "grande premio"].includes(q) || q.length < 4);
+  const generic = includeAll && ["f1", "formula", "formula 1", "formula1", "grand prix", "grande premio"].includes(q);
   return races
     .filter((r) => generic || r._hay.includes(q) || r._hay.includes(qEn))
-    .sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
+    .sort((a, b) => {
+      const now = Date.now();
+      const at = a.date ? Date.parse(a.date) : Infinity;
+      const bt = b.date ? Date.parse(b.date) : Infinity;
+      if ((at >= now) !== (bt >= now)) return at >= now ? -1 : 1;
+      return Math.abs(at - now) - Math.abs(bt - now);
+    })
     .slice(0, 15)
     .map(({ _hay, ...ev }) => ev);
 }

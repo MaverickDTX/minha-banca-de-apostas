@@ -7,6 +7,7 @@ import { translateEventName, translateLeague, translateTeamName } from "@/lib/tr
 import type { SportEvent } from "@/lib/sportsdb";
 import { searchEventsApiSports } from "@/lib/apisports";
 import { searchF1Races } from "@/lib/apisportsF1";
+import { searchMmaEvents } from "@/lib/mma";
 
 const API_KEY = import.meta.env.VITE_API_SPORTS_KEY as string | undefined;
 
@@ -20,10 +21,6 @@ function logApiError(host: string, params: string, json: unknown) {
   if (err && (Array.isArray(err) ? err.length : Object.keys(err).length)) {
     console.warn("[api-sports]", host, "errors:", err, "params:", params);
   }
-}
-
-function getSeason(): number {
-  return new Date().getFullYear();
 }
 
 function seasonParam(fmt: "year" | "range"): string {
@@ -124,79 +121,6 @@ async function searchV1TeamSport(
 // ---------------------------------------------------------------------------
 // Adapter: MMA (v1.mma.api-sports.io)
 // ---------------------------------------------------------------------------
-type MmaFighter = { id: number; name: string };
-type MmaFight = {
-  id: number;
-  date: string;
-  fighters: { fighter: { id: number; name: string } }[];
-};
-
-async function searchMma(
-  query: string,
-  signal?: AbortSignal,
-): Promise<SportEvent[]> {
-  if (!API_KEY) return [];
-  const q = query.trim();
-  if (q.length < 2) return [];
-
-  // 1) Find fighter by name (não depende de temporada)
-  let fighterId: number | null = null;
-  let fighterName = "";
-  try {
-    const res = await fetch(
-      `https://v1.mma.api-sports.io/fighters?search=${encodeURIComponent(q)}`,
-      { headers: headers(), signal },
-    );
-    if (res.ok) {
-      const json = await res.json();
-      logApiError("v1.mma.api-sports.io", `fighters?search=${encodeURIComponent(q)}`, json);
-      const fighters: MmaFighter[] = Array.isArray(json?.response)
-        ? json.response.slice(0, 1)
-        : [];
-      fighterId = fighters[0]?.id ?? null;
-      fighterName = fighters[0]?.name ?? "";
-    }
-  } catch {
-    /* ignore */
-  }
-
-  if (!fighterId) return [];
-
-  // 2) Get fights — free plan só cobre 2022–2024; tenta da mais recente p/ mais antiga
-  const seasons = [getSeason() - 2, getSeason() - 3, getSeason() - 4]; // 2024, 2023, 2022
-  for (const s of seasons) {
-    try {
-      const res = await fetch(
-        `https://v1.mma.api-sports.io/fights?fighter=${fighterId}&season=${s}`,
-        { headers: headers(), signal },
-      );
-      if (!res.ok) continue;
-      const json = await res.json();
-      logApiError("v1.mma.api-sports.io", `fights?fighter=${fighterId}&season=${s}`, json);
-      const fights: MmaFight[] = Array.isArray(json?.response) ? json.response : [];
-      if (fights.length === 0) continue;
-
-      return fights.map((f) => {
-        const a = f.fighters[0]?.fighter.name ?? "";
-        const b = f.fighters[1]?.fighter.name ?? "";
-        const rawName = `${a} vs ${b}`;
-        return {
-          id: `apisports-mma-${f.id}`,
-          name: translateEventName(rawName, a, b),
-          sport: "MMA",
-          league: "MMA",
-          date: new Date(f.date).toISOString(),
-          homeTeam: a,
-          awayTeam: b,
-        } satisfies SportEvent;
-      });
-    } catch {
-      continue;
-    }
-  }
-  return [];
-}
-
 // ---------------------------------------------------------------------------
 // Registry: label PT-BR (lowercased) → config do produto API-Sports
 // ---------------------------------------------------------------------------
@@ -244,7 +168,7 @@ export async function searchEventsBySport(
     case "v1_team":
       return searchV1TeamSport(api.host, query, api.sport, api.seasonFmt, signal);
     case "mma":
-      return searchMma(query, signal);
+      return searchMmaEvents(query, signal);
     case "f1":
       return searchF1Races(query, signal);
   }
